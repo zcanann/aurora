@@ -136,6 +136,8 @@ void aurora_set_log_level(AuroraLogLevel level);
 void aurora_set_pause_on_focus_lost(bool value);
 void aurora_set_background_input(bool value);
 void aurora_set_resampler(AuroraSampler sampler);
+void aurora_set_automation_input_quarantine(bool value);
+bool aurora_get_automation_input_quarantine();
 
 AuroraBackend aurora_get_backend();
 const AuroraBackend* aurora_get_available_backends(size_t* count);

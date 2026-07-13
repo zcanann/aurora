@@ -442,6 +442,14 @@ void aurora_set_background_input(bool value) {
   aurora::g_config.allowJoystickBackgroundEvents = value;
   aurora::window::set_background_input(value);
 }
+
+void aurora_set_automation_input_quarantine(const bool value) {
+  aurora::window::set_automation_input_quarantine(value);
+}
+
+bool aurora_get_automation_input_quarantine() {
+  return aurora::window::get_automation_input_quarantine();
+}
 void aurora_set_resampler(AuroraSampler sampler) {
 #ifdef AURORA_ENABLE_GX
   aurora::webgpu::set_resampler(sampler);

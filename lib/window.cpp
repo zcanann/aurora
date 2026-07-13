@@ -45,6 +45,7 @@ bool g_frameBufferAspectFit = false;
 AuroraWindowSize g_windowSize;
 std::vector<AuroraEvent> g_events;
 std::atomic_bool g_backgrounded = false;
+std::atomic_bool g_automationInputQuarantine = false;
 #if defined(SDL_PLATFORM_ANDROID)
 std::atomic_bool g_surfaceReady = false;
 #else
@@ -142,13 +143,26 @@ void sync_paused() {
   });
 }
 
+bool is_user_input_event(const Uint32 type) {
+  return (type >= SDL_EVENT_KEY_DOWN && type <= SDL_EVENT_TEXT_EDITING_CANDIDATES) ||
+         (type >= SDL_EVENT_MOUSE_MOTION && type <= SDL_EVENT_MOUSE_REMOVED) ||
+         (type >= SDL_EVENT_JOYSTICK_AXIS_MOTION && type <= SDL_EVENT_JOYSTICK_UPDATE_COMPLETE) ||
+         (type >= SDL_EVENT_GAMEPAD_AXIS_MOTION && type <= SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED) ||
+         (type >= SDL_EVENT_FINGER_DOWN && type <= SDL_EVENT_FINGER_CANCELED) ||
+         (type >= SDL_EVENT_PEN_PROXIMITY_IN && type <= SDL_EVENT_PEN_AXIS);
+}
+
 void process_event(SDL_Event& event) {
+  const bool quarantinedInput =
+      g_automationInputQuarantine.load(std::memory_order_relaxed) && is_user_input_event(event.type);
+  if (!quarantinedInput) {
 #ifdef AURORA_ENABLE_GX
-  imgui::process_event(event);
+    imgui::process_event(event);
 #endif
 #ifdef AURORA_ENABLE_RMLUI
-  rmlui::handle_event(event);
+    rmlui::handle_event(event);
 #endif
+  }
 
   switch (event.type) {
   case SDL_EVENT_WINDOW_MOVED: {
@@ -191,7 +205,9 @@ void process_event(SDL_Event& event) {
     break;
   }
   case SDL_EVENT_MOUSE_WHEEL:
-    input::set_mouse_scroll(event.wheel.x, event.wheel.y);
+    if (!quarantinedInput) {
+      input::set_mouse_scroll(event.wheel.x, event.wheel.y);
+    }
     break;
   case SDL_EVENT_QUIT:
     g_events.push_back(AuroraEvent{
@@ -216,12 +232,25 @@ void process_event(SDL_Event& event) {
   }
 
   sync_paused();
-  g_events.push_back(AuroraEvent{
-      .type = AURORA_SDL_EVENT,
-      .sdl = event,
-  });
+  if (!quarantinedInput) {
+    g_events.push_back(AuroraEvent{
+        .type = AURORA_SDL_EVENT,
+        .sdl = event,
+    });
+  }
 }
 } // namespace
+
+void set_automation_input_quarantine(const bool value) {
+  g_automationInputQuarantine.store(value, std::memory_order_relaxed);
+  if (value) {
+    input::set_mouse_scroll(0, 0);
+  }
+}
+
+bool get_automation_input_quarantine() {
+  return g_automationInputQuarantine.load(std::memory_order_relaxed);
+}
 
 const AuroraEvent* poll_events() {
   ZoneScoped;
