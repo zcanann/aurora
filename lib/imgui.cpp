@@ -177,6 +177,11 @@ DrawData freeze() noexcept {
   return DrawData{std::move(frozen)};
 }
 
+void discard_frame() noexcept {
+  ZoneScoped;
+  ImGui::Render();
+}
+
 void render(const wgpu::RenderPassEncoder& pass, const DrawData& drawData) noexcept {
   ZoneScoped;
 

@@ -35,5 +35,6 @@ void process_event(const SDL_Event& event) noexcept;
 bool wants_capture_event(const SDL_Event& event) noexcept;
 void new_frame(const AuroraWindowSize& size) noexcept;
 DrawData freeze() noexcept;
+void discard_frame() noexcept;
 void render(const wgpu::RenderPassEncoder& pass, const DrawData& drawData) noexcept;
 } // namespace aurora::imgui

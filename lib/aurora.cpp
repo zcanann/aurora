@@ -221,7 +221,7 @@ const AuroraEvent* update() noexcept {
 bool begin_frame() noexcept {
   ZoneScoped;
 #ifdef AURORA_ENABLE_GX
-  {
+  if (!g_config.disablePresentation) {
     if (!window::is_presentable()) {
       webgpu::release_surface();
       return false;
@@ -250,6 +250,23 @@ void end_frame() noexcept {
 #ifdef AURORA_ENABLE_GX
   gx::fifo::drain();
   gfx::finish();
+
+  if (g_config.disablePresentation) {
+    imgui::discard_frame();
+    gfx::end_frame([](wgpu::CommandEncoder& encoder) {
+      webgpu::gpu_prof::frame_end(encoder);
+      const wgpu::CommandBufferDescriptor cmdBufDescriptor{.label = "Headless frame command buffer"};
+      const auto buffer = encoder.Finish(&cmdBufDescriptor);
+      {
+        ZoneScopedN("Queue Submit");
+        g_queue.Submit(1, &buffer);
+      }
+      webgpu::gpu_prof::after_submit();
+      gfx::after_submit();
+    });
+    return;
+  }
+
   auto imguiDrawData = imgui::freeze();
 
   const auto& presentSource = webgpu::present_source();

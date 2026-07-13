@@ -93,6 +93,11 @@ typedef struct {
   bool pauseOnFocusLost;
   bool allowTextureDumps;
   bool allowCpuAdapter;
+  /*
+   * Execute and submit emulated GPU work without acquiring or presenting a host
+   * swapchain image. Intended for callers running simulation-only workloads.
+   */
+  bool disablePresentation;
   int32_t windowPosX;
   int32_t windowPosY;
   uint32_t windowWidth;
