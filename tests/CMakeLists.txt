@@ -1,5 +1,6 @@
 include(FetchContent)
 include(GoogleTest)
+include(${CMAKE_CURRENT_LIST_DIR}/../cmake/AuroraCopyRuntimeDLLs.cmake)
 
 if (NOT TARGET gtest)
   FetchContent_Declare(googletest
@@ -96,6 +97,30 @@ if (TARGET aurora::dvd)
   endif ()
 
   gtest_discover_tests(dvd_tests)
+endif ()
+
+# CARD API tests
+if (TARGET aurora::card)
+  # Compile the focused card implementation directly so the test does not pull
+  # in aurora::core's renderer runtime through aurora::card.
+  add_executable(card_tests
+    card_gci_folder_test.cpp
+    ../lib/card/BlockAllocationTable.cpp
+    ../lib/card/CardGciFolder.cpp
+    ../lib/card/File.cpp
+    ../lib/card/FileIO.cpp
+    ../lib/card/Util.cpp
+  )
+  target_include_directories(card_tests PRIVATE ../include ../lib)
+  target_compile_definitions(card_tests PRIVATE AURORA TARGET_PC)
+  target_link_libraries(card_tests PRIVATE
+    gtest
+    gtest_main
+    fmt::fmt
+    ${AURORA_SDL3_TARGET}
+  )
+  aurora_copy_runtime_dlls(card_tests)
+  gtest_discover_tests(card_tests)
 endif ()
 
 add_executable(os_alloc_tests
