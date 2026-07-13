@@ -110,3 +110,14 @@ target_include_directories(os_alloc_tests PRIVATE
 target_compile_definitions(os_alloc_tests PRIVATE AURORA TARGET_PC)
 target_link_libraries(os_alloc_tests PRIVATE gtest gtest_main fmt::fmt)
 gtest_discover_tests(os_alloc_tests)
+
+add_executable(os_time_tests
+  os_time_test.cpp
+  os_time_test_globals.cpp
+  ../lib/dolphin/os/OSTime.cpp
+  ../lib/logging.cpp
+)
+target_include_directories(os_time_tests PRIVATE ../include)
+target_compile_definitions(os_time_tests PRIVATE AURORA TARGET_PC)
+target_link_libraries(os_time_tests PRIVATE gtest gtest_main fmt::fmt)
+gtest_discover_tests(os_time_tests)

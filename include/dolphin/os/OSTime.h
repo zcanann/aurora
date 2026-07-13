@@ -10,6 +10,28 @@ extern "C" {
 typedef s64 OSTime;
 typedef u32 OSTick;
 
+#ifdef TARGET_PC
+/**
+ * Opt-in logical clock used by deterministic simulation.
+ *
+ * rateNumerator/rateDenominator is the logical update rate in hertz. For a
+ * 30 Hz simulation pass 30/1. Advances retain their fractional timer-tick
+ * remainder, so rational rates do not accumulate truncation drift.
+ *
+ * This controls OSGetTime and therefore OSGetTick. It does not advance or
+ * dispatch OSAlarm callbacks, redirect the SDK's separate __OSGetSystemTime
+ * implementation, or replace host steady/system clocks used by profiling and
+ * worker infrastructure. Code that busy-waits on OSGetTime will remain paused
+ * until the simulation driver explicitly advances this clock.
+ */
+BOOL AuroraEnableDeterministicTime(OSTime initialTicks, u32 rateNumerator,
+                                   u32 rateDenominator);
+void AuroraDisableDeterministicTime(void);
+BOOL AuroraIsDeterministicTimeEnabled(void);
+BOOL AuroraResetDeterministicTime(OSTime ticks);
+BOOL AuroraAdvanceDeterministicTime(u64 logicalTicks);
+#endif
+
 #define OSDiffTick(tick1, tick0) ((s32)(tick1) - (s32)(tick0))
 
 // Time base frequency = 1/4 bus clock

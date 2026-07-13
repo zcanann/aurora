@@ -1,5 +1,8 @@
 #include <chrono>
 #include <ctime>
+#include <atomic>
+#include <limits>
+#include <mutex>
 
 #include "internal.hpp"
 #include <dolphin/os.h>
@@ -48,11 +51,64 @@ static LocalTime SystemTimeToLocalTime(SystemTime time) {
 
 static const LocalTime startupLocalTime = SystemTimeToLocalTime(startupTime);
 
-OSTick OSGetTick() {
-    return OSGetTime() & 0xFFFFFFFF;
+namespace {
+
+struct DeterministicClock {
+    std::atomic<bool> enabled{false};
+    std::atomic<OSTime> ticks{0};
+    std::mutex writerMutex;
+    u64 stepTickNumerator = 0;
+    u32 stepTickDenominator = 1;
+    u64 remainder = 0;
+};
+
+DeterministicClock g_deterministicClock;
+
+bool CheckedMultiply(const u64 lhs, const u64 rhs, u64& result) {
+    if (lhs != 0 && rhs > std::numeric_limits<u64>::max() / lhs) {
+        return false;
+    }
+    result = lhs * rhs;
+    return true;
 }
 
-OSTime OSGetTime() {
+bool CheckedAdd(const u64 lhs, const u64 rhs, u64& result) {
+    if (rhs > std::numeric_limits<u64>::max() - lhs) {
+        return false;
+    }
+    result = lhs + rhs;
+    return true;
+}
+
+bool AddUnsignedTicks(const OSTime current, const u64 delta, OSTime& result) {
+    if (delta == 0) {
+        result = current;
+        return true;
+    }
+    if (current >= 0) {
+        const u64 available = static_cast<u64>(std::numeric_limits<OSTime>::max() - current);
+        if (delta > available) {
+            return false;
+        }
+        result = current + static_cast<OSTime>(delta);
+        return true;
+    }
+
+    const u64 distanceToZero = static_cast<u64>(-(current + 1)) + 1;
+    if (delta < distanceToZero) {
+        const u64 magnitude = distanceToZero - delta;
+        result = -static_cast<OSTime>(magnitude);
+        return true;
+    }
+    const u64 positive = delta - distanceToZero;
+    if (positive > static_cast<u64>(std::numeric_limits<OSTime>::max())) {
+        return false;
+    }
+    result = static_cast<OSTime>(positive);
+    return true;
+}
+
+OSTime GetRealtimeOSTime() {
     // System time is provided in the number of timer ticks since 2000-01-01 00:00:00
     // Use time_t arithmetic to avoid chrono duration_cast overflow issues on some platforms.
 
@@ -93,6 +149,91 @@ OSTime OSGetTime() {
     s64 ticksFromRemainder = remainderMicros * static_cast<s64>(OS_TIMER_CLOCK) / 1000000LL;
 
     return ticksFromSeconds + ticksFromRemainder;
+}
+
+} // namespace
+
+OSTick OSGetTick() {
+    return OSGetTime() & 0xFFFFFFFF;
+}
+
+OSTime OSGetTime() {
+    if (g_deterministicClock.enabled.load(std::memory_order_acquire)) {
+        return g_deterministicClock.ticks.load(std::memory_order_acquire);
+    }
+    return GetRealtimeOSTime();
+}
+
+BOOL AuroraEnableDeterministicTime(const OSTime initialTicks, const u32 rateNumerator,
+                                   const u32 rateDenominator) {
+    if (rateNumerator == 0 || rateDenominator == 0) {
+        return FALSE;
+    }
+    const u64 stepNumerator = static_cast<u64>(OS_TIMER_CLOCK) * rateDenominator;
+
+    std::lock_guard lock(g_deterministicClock.writerMutex);
+    g_deterministicClock.stepTickNumerator = stepNumerator;
+    g_deterministicClock.stepTickDenominator = rateNumerator;
+    g_deterministicClock.remainder = 0;
+    g_deterministicClock.ticks.store(initialTicks, std::memory_order_release);
+    g_deterministicClock.enabled.store(true, std::memory_order_release);
+    return TRUE;
+}
+
+void AuroraDisableDeterministicTime() {
+    std::lock_guard lock(g_deterministicClock.writerMutex);
+    g_deterministicClock.enabled.store(false, std::memory_order_release);
+}
+
+BOOL AuroraIsDeterministicTimeEnabled() {
+    return g_deterministicClock.enabled.load(std::memory_order_acquire) ? TRUE : FALSE;
+}
+
+BOOL AuroraResetDeterministicTime(const OSTime ticks) {
+    std::lock_guard lock(g_deterministicClock.writerMutex);
+    if (!g_deterministicClock.enabled.load(std::memory_order_acquire)) {
+        return FALSE;
+    }
+    g_deterministicClock.remainder = 0;
+    g_deterministicClock.ticks.store(ticks, std::memory_order_release);
+    return TRUE;
+}
+
+BOOL AuroraAdvanceDeterministicTime(const u64 logicalTicks) {
+    std::lock_guard lock(g_deterministicClock.writerMutex);
+    if (!g_deterministicClock.enabled.load(std::memory_order_acquire)) {
+        return FALSE;
+    }
+
+    const u64 divisor = g_deterministicClock.stepTickDenominator;
+    const u64 wholeTicks = g_deterministicClock.stepTickNumerator / divisor;
+    const u64 fractionalTicks = g_deterministicClock.stepTickNumerator % divisor;
+    const u64 cycles = logicalTicks / divisor;
+    const u64 tailSteps = logicalTicks % divisor;
+
+    u64 wholeDelta;
+    u64 cycleDelta;
+    if (!CheckedMultiply(wholeTicks, logicalTicks, wholeDelta) ||
+        !CheckedMultiply(fractionalTicks, cycles, cycleDelta)) {
+        return FALSE;
+    }
+    const u64 tailNumerator = g_deterministicClock.remainder + fractionalTicks * tailSteps;
+    const u64 tailDelta = tailNumerator / divisor;
+    const u64 newRemainder = tailNumerator % divisor;
+
+    u64 delta;
+    if (!CheckedAdd(wholeDelta, cycleDelta, delta) || !CheckedAdd(delta, tailDelta, delta)) {
+        return FALSE;
+    }
+
+    const OSTime current = g_deterministicClock.ticks.load(std::memory_order_relaxed);
+    OSTime advanced;
+    if (!AddUnsignedTicks(current, delta, advanced)) {
+        return FALSE;
+    }
+    g_deterministicClock.remainder = newRemainder;
+    g_deterministicClock.ticks.store(advanced, std::memory_order_release);
+    return TRUE;
 }
 
 void AuroraInitClock() {
