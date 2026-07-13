@@ -31,6 +31,8 @@ std::array<PADButtonMapping, PAD_BUTTON_COUNT> g_defaultButtonsStandard{{
 
 std::array<PADStatus, PAD_CHANMAX> g_virtualPadStatus{};
 std::array<bool, PAD_CHANMAX> g_virtualPadActive{};
+std::array<PADStatus, PAD_CHANMAX> g_automationPadStatus{};
+std::array<bool, PAD_CHANMAX> g_automationPadActive{};
 
 std::array<PADButtonMapping, PAD_BUTTON_COUNT> g_defaultButtonsXBox360{{
     {SDL_GAMEPAD_BUTTON_SOUTH, PAD_BUTTON_A},
@@ -691,7 +693,8 @@ u32 PADRead(PADStatus* status) {
       rumbleSupport |= PAD_CHAN0_BIT;
     }
     auto controller = aurora::input::get_controller_for_player(i);
-    if (controller == nullptr && !g_keyboardBindings[i].m_mappingsSet && !g_virtualPadActive[i]) {
+    if (controller == nullptr && !g_keyboardBindings[i].m_mappingsSet && !g_virtualPadActive[i] &&
+        !g_automationPadActive[i]) {
       status[i].err = PAD_ERR_NO_CONTROLLER;
       g_suppressedButtons[i] = 0;
       g_suppressLeftTrigger[i] = false;
@@ -900,7 +903,11 @@ u32 PADRead(PADStatus* status) {
       }
     }
 
-    if (g_blockPAD) {
+    if (g_automationPadActive[i]) {
+      // Automation owns the complete port state. Apply it last so physical,
+      // keyboard, touch, and other virtual sources cannot affect playback.
+      status[i] = g_automationPadStatus[i];
+    } else if (g_blockPAD) {
       neutralize_status(status[i]);
     } else {
       apply_unblock_suppression(status[i], i, captureHeldInput);
@@ -934,6 +941,29 @@ void PADClearVirtualStatus(const u32 port) {
 void PADClearAllVirtualStatus() {
   g_virtualPadStatus.fill({});
   g_virtualPadActive.fill(false);
+}
+
+void PADSetAutomationStatus(const u32 port, const PADStatus* automationStatus) {
+  if (port >= PAD_CHANMAX || automationStatus == nullptr) {
+    return;
+  }
+
+  g_automationPadStatus[port] = *automationStatus;
+  g_automationPadActive[port] = true;
+}
+
+void PADClearAutomationStatus(const u32 port) {
+  if (port >= PAD_CHANMAX) {
+    return;
+  }
+
+  g_automationPadStatus[port] = {};
+  g_automationPadActive[port] = false;
+}
+
+void PADClearAllAutomationStatus() {
+  g_automationPadStatus.fill({});
+  g_automationPadActive.fill(false);
 }
 
 void PADControlMotor(const u32 chan, const u32 cmd) {

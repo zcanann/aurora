@@ -227,6 +227,18 @@ void PADClearVirtualStatus(u32 port);
 void PADClearAllVirtualStatus();
 
 /**
+ * Supplies the complete status for a port from an automation driver.
+ *
+ * Unlike virtual status, automation status is exclusive: while active, no
+ * keyboard, mouse, physical controller, or virtual-controller input is merged
+ * into the port. This makes recorded input deterministic while leaving the
+ * existing virtual-input behavior unchanged.
+ */
+void PADSetAutomationStatus(u32 port, const PADStatus* status);
+void PADClearAutomationStatus(u32 port);
+void PADClearAllAutomationStatus();
+
+/**
  * Set the default controller mapping used.
  *
  * Must be called before PADInit.
