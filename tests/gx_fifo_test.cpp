@@ -1633,6 +1633,83 @@ TEST_F(GXFifoTest, NumChans) {
   decode_fifo(bytes);
 
   EXPECT_EQ(g_gxState.numChans, 2u);
+  EXPECT_EQ(g_gxState.xfNumChansRaw, 2u);
+  EXPECT_EQ(g_gxState.bpNumChansRaw, 2u);
+}
+
+TEST_F(GXFifoTest, NumChansPreservesRawXfBpMismatch) {
+  GXSetNumChans(12);
+  auto bytes = flush_and_capture();
+
+  reset_gx_state();
+  decode_fifo(bytes);
+
+  EXPECT_EQ(g_gxState.xfNumChansRaw, 12u);
+  EXPECT_EQ(g_gxState.bpNumChansRaw, 4u);
+  EXPECT_EQ(g_gxState.numChans, 4u);
+
+  AuroraGXChannelCountTelemetry telemetry{};
+  aurora_get_gx_channel_count_telemetry(&telemetry);
+  EXPECT_EQ(telemetry.mismatchLatched, 0u);
+  EXPECT_EQ(telemetry.mismatchDrawCount, 0u);
+}
+
+TEST_F(GXFifoTest, NumChansMismatchLatchesOnlyAtDrawBoundary) {
+  GXSetNumChans(12);
+  GXBegin(GX_TRIANGLES, GX_VTXFMT0, 0);
+  GXEnd();
+  auto bytes = capture_fifo();
+
+  reset_gx_state();
+  aurora_reset_gx_channel_count_telemetry();
+  decode_fifo(bytes);
+
+  AuroraGXChannelCountTelemetry telemetry{};
+  aurora_get_gx_channel_count_telemetry(&telemetry);
+  EXPECT_EQ(telemetry.xfNumChansRaw, 12u);
+  EXPECT_EQ(telemetry.bpNumChansRaw, 4u);
+  EXPECT_EQ(telemetry.lastDrawMismatched, 1u);
+  EXPECT_EQ(telemetry.mismatchLatched, 1u);
+  EXPECT_EQ(telemetry.eyeShredderMismatchLatched, 1u);
+  EXPECT_EQ(telemetry.totalDrawCount, 1u);
+  EXPECT_EQ(telemetry.mismatchDrawCount, 1u);
+  EXPECT_EQ(telemetry.firstMismatchDraw, 1u);
+  EXPECT_EQ(telemetry.lastMismatchDraw, 1u);
+  EXPECT_EQ(telemetry.revision, 1u);
+
+  aurora_reset_gx_channel_count_telemetry();
+  AuroraGXChannelCountTelemetry resetTelemetry{};
+  aurora_get_gx_channel_count_telemetry(&resetTelemetry);
+  EXPECT_EQ(resetTelemetry.xfNumChansRaw, 12u);
+  EXPECT_EQ(resetTelemetry.bpNumChansRaw, 4u);
+  EXPECT_EQ(resetTelemetry.lastDrawMismatched, 0u);
+  EXPECT_EQ(resetTelemetry.mismatchLatched, 0u);
+  EXPECT_EQ(resetTelemetry.eyeShredderMismatchLatched, 0u);
+  EXPECT_EQ(resetTelemetry.totalDrawCount, 0u);
+  EXPECT_EQ(resetTelemetry.mismatchDrawCount, 0u);
+  EXPECT_EQ(resetTelemetry.firstMismatchDraw, 0u);
+  EXPECT_EQ(resetTelemetry.lastMismatchDraw, 0u);
+  EXPECT_EQ(resetTelemetry.revision, 0u);
+}
+
+TEST_F(GXFifoTest, MatchingNumChansDrawDoesNotLatchMismatch) {
+  GXSetNumChans(2);
+  GXBegin(GX_TRIANGLES, GX_VTXFMT0, 0);
+  GXEnd();
+  auto bytes = capture_fifo();
+
+  reset_gx_state();
+  aurora_reset_gx_channel_count_telemetry();
+  decode_fifo(bytes);
+
+  AuroraGXChannelCountTelemetry telemetry{};
+  aurora_get_gx_channel_count_telemetry(&telemetry);
+  EXPECT_EQ(telemetry.xfNumChansRaw, 2u);
+  EXPECT_EQ(telemetry.bpNumChansRaw, 2u);
+  EXPECT_EQ(telemetry.lastDrawMismatched, 0u);
+  EXPECT_EQ(telemetry.mismatchLatched, 0u);
+  EXPECT_EQ(telemetry.totalDrawCount, 1u);
+  EXPECT_EQ(telemetry.mismatchDrawCount, 0u);
 }
 
 // ============================================================================

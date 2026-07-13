@@ -370,7 +370,11 @@ struct GXState {
   bool depthUpdate = true;
   bool colorUpdate = true;
   bool alphaUpdate = true;
-  u8 numChans = 0;
+  // BP stores only three channel-count bits while XF accepts a raw register
+  // value. Preserve both: invalid retail states can intentionally disagree.
+  u32 xfNumChansRaw = 0;
+  u8 bpNumChansRaw = 0;
+  u8 numChans = 0; // Compatibility view of BP's decoded three-bit count.
   u8 numIndStages = 0;
   u8 numTevStages = 0;
   u8 numTexGens = 0;

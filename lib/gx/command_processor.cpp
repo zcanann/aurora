@@ -15,10 +15,71 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <mutex>
 #include <optional>
 
 namespace aurora::gx::fifo {
 static Module Log("aurora::gx::fifo");
+
+namespace {
+std::mutex s_channelCountTelemetryMutex;
+AuroraGXChannelCountTelemetry s_channelCountTelemetry{};
+
+void set_bp_num_chans(const u8 value) {
+  std::lock_guard lock{s_channelCountTelemetryMutex};
+  g_gxState.bpNumChansRaw = value;
+  g_gxState.numChans = value;
+  s_channelCountTelemetry.bpNumChansRaw = value;
+}
+
+void set_xf_num_chans(const u32 value) {
+  std::lock_guard lock{s_channelCountTelemetryMutex};
+  g_gxState.xfNumChansRaw = value;
+  s_channelCountTelemetry.xfNumChansRaw = value;
+}
+
+void record_channel_count_draw_boundary() {
+  bool shouldLog = false;
+  u64 firstMismatchDraw = 0;
+  u32 mismatchXfNumChansRaw = 0;
+  u32 mismatchBpNumChansRaw = 0;
+  {
+    std::lock_guard lock{s_channelCountTelemetryMutex};
+    auto& telemetry = s_channelCountTelemetry;
+    telemetry.xfNumChansRaw = g_gxState.xfNumChansRaw;
+    telemetry.bpNumChansRaw = g_gxState.bpNumChansRaw;
+    ++telemetry.totalDrawCount;
+
+    const bool mismatched = telemetry.xfNumChansRaw != telemetry.bpNumChansRaw;
+    telemetry.lastDrawMismatched = mismatched ? 1u : 0u;
+    if (!mismatched) {
+      return;
+    }
+
+    ++telemetry.mismatchDrawCount;
+    ++telemetry.revision;
+    telemetry.lastMismatchXfNumChansRaw = telemetry.xfNumChansRaw;
+    telemetry.lastMismatchBpNumChansRaw = telemetry.bpNumChansRaw;
+    telemetry.lastMismatchDraw = telemetry.totalDrawCount;
+    if (telemetry.mismatchLatched == 0) {
+      telemetry.mismatchLatched = 1;
+      telemetry.firstMismatchDraw = telemetry.totalDrawCount;
+      shouldLog = true;
+      firstMismatchDraw = telemetry.totalDrawCount;
+      mismatchXfNumChansRaw = telemetry.xfNumChansRaw;
+      mismatchBpNumChansRaw = telemetry.bpNumChansRaw;
+    }
+    if (telemetry.xfNumChansRaw == 12 && telemetry.bpNumChansRaw == 4) {
+      telemetry.eyeShredderMismatchLatched = 1;
+    }
+  }
+
+  if (shouldLog) {
+    Log.warn("Mismatched GX color-channel configuration at draw {}: XF={} BP={}", firstMismatchDraw,
+             mismatchXfNumChansRaw, mismatchBpNumChansRaw);
+  }
+}
+} // namespace
 
 static u16 prepare_idx_buffer(ByteBuffer& buf, GXPrimitive prim, u16 vtxStart, u16 vtxCount) {
   u16 numIndices = 0;
@@ -569,7 +630,7 @@ static void handle_bp(u32 value, bool bigEndian) {
   // genMode (0x00)
   case 0x00: {
     g_gxState.numTexGens = bp_get(value, 4, 0);
-    g_gxState.numChans = bp_get(value, 3, 4);
+    set_bp_num_chans(static_cast<u8>(bp_get(value, 3, 4)));
     g_gxState.numTevStages = bp_get(value, 4, 10) + 1;
     u32 hwCull = bp_get(value, 2, 14);
     // Swap front/back to match GX convention
@@ -1307,7 +1368,7 @@ static void handle_xf(const u8* data, u32& pos, u32 size, bool bigEndian) {
         break;
       case 0x09:
         // numChans
-        g_gxState.numChans = val;
+        set_xf_num_chans(val);
         g_gxState.stateDirty = true;
         break;
       case 0x0A:
@@ -1559,6 +1620,7 @@ static ByteBuffer handle_draw_idx_buf;
 
 static void draw_prim(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, const u8* data, u32& pos, u32 size) {
   ZoneScoped;
+  record_channel_count_draw_boundary();
   u32 vtxSize;
   if (g_gxState.lastVtxFmt == fmt)
     LIKELY { vtxSize = g_gxState.lastVtxSize; }
@@ -1928,6 +1990,7 @@ void handle_aurora(const u8* data, u32& pos, u32 size, bool bigEndian) {
     const gfx::Range vertRange = gfx::push_verts(data + pos, totalVtxBytes, 4);
     pos += totalVtxBytes;
     if (indexCount != 0) {
+      record_channel_count_draw_boundary();
       push_gx_draw(prim, fmt, vtxCount, vertRange, idxRange, indexCount);
     }
   } else if (subCmd == GX_AURORA_DEBUG_GROUP_PUSH) {
@@ -1945,4 +2008,24 @@ void handle_aurora(const u8* data, u32& pos, u32 size, bool bigEndian) {
   }
 }
 
+void get_channel_count_telemetry(AuroraGXChannelCountTelemetry& outTelemetry) {
+  std::lock_guard lock{s_channelCountTelemetryMutex};
+  outTelemetry = s_channelCountTelemetry;
+}
+
+void reset_channel_count_telemetry() {
+  std::lock_guard lock{s_channelCountTelemetryMutex};
+  s_channelCountTelemetry = {};
+  s_channelCountTelemetry.xfNumChansRaw = g_gxState.xfNumChansRaw;
+  s_channelCountTelemetry.bpNumChansRaw = g_gxState.bpNumChansRaw;
+}
+
 } // namespace aurora::gx::fifo
+
+void aurora_get_gx_channel_count_telemetry(AuroraGXChannelCountTelemetry* outTelemetry) {
+  if (outTelemetry != nullptr) {
+    aurora::gx::fifo::get_channel_count_telemetry(*outTelemetry);
+  }
+}
+
+void aurora_reset_gx_channel_count_telemetry() { aurora::gx::fifo::reset_channel_count_telemetry(); }

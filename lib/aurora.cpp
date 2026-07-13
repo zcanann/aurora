@@ -7,6 +7,7 @@
 #include "imgui.hpp"
 #include "webgpu/gpu.hpp"
 #include "webgpu/gpu_prof.hpp"
+#include <aurora/imgui.h>
 #include <webgpu/webgpu_cpp.h>
 #endif
 
@@ -53,6 +54,49 @@ void set_present_viewport(const wgpu::RenderPassEncoder& pass, const gfx::Viewpo
   const auto scissorRight = clamp_scissor_coord(std::ceil(viewport.left + viewport.width), surfaceWidth);
   const auto scissorBottom = clamp_scissor_coord(std::ceil(viewport.top + viewport.height), surfaceHeight);
   pass.SetScissorRect(scissorX, scissorY, scissorRight - scissorX, scissorBottom - scissorY);
+}
+
+void draw_gx_channel_count_diagnostic() {
+  AuroraGXChannelCountTelemetry telemetry{};
+  aurora_get_gx_channel_count_telemetry(&telemetry);
+  if (telemetry.mismatchLatched == 0) {
+    return;
+  }
+
+  ImDrawList* drawList = ImGui::GetForegroundDrawList();
+  const ImVec2 display = ImGui::GetIO().DisplaySize;
+  if (drawList == nullptr || display.x <= 0.f || display.y <= 0.f) {
+    return;
+  }
+
+  constexpr ImU32 magenta = IM_COL32(255, 0, 190, 225);
+  constexpr ImU32 cyan = IM_COL32(0, 235, 255, 225);
+  constexpr ImU32 shade = IM_COL32(0, 0, 0, 150);
+  constexpr float border = 10.f;
+  drawList->AddRect(ImVec2(3.f, 3.f), ImVec2(display.x - 3.f, display.y - 3.f), magenta, 0.f, 0, border);
+  drawList->AddRect(ImVec2(14.f, 14.f), ImVec2(display.x - 14.f, display.y - 14.f), cyan, 0.f, 0, 4.f);
+
+  // Deliberately synthetic and conspicuous. This visualizes the diagnosed
+  // register mismatch; it does not claim pixel-perfect Flipper raster output.
+  for (unsigned int band = 0; band < 8; ++band) {
+    const float y = 34.f + static_cast<float>(band) * std::max(28.f, (display.y - 68.f) / 8.f);
+    const float offset = static_cast<float>((band * 37u + telemetry.lastMismatchXfNumChansRaw * 11u +
+                                             telemetry.lastMismatchBpNumChansRaw * 7u) %
+                                            91u);
+    const float left = (band & 1u) == 0 ? 0.f : display.x * 0.42f + offset;
+    const float right = (band & 1u) == 0 ? display.x * 0.58f + offset : display.x;
+    drawList->AddRectFilled(ImVec2(left, y), ImVec2(std::min(right, display.x), y + 7.f),
+                            (band & 1u) == 0 ? magenta : cyan);
+  }
+
+  const uint32_t xf = telemetry.eyeShredderMismatchLatched != 0 ? 12u : telemetry.lastMismatchXfNumChansRaw;
+  const uint32_t bp = telemetry.eyeShredderMismatchLatched != 0 ? 4u : telemetry.lastMismatchBpNumChansRaw;
+  const std::string label = fmt::format("GX DIAGNOSTIC - XF/BP CHANNEL MISMATCH: {} / {}", xf, bp);
+  const ImVec2 textSize = ImGui::CalcTextSize(label.c_str());
+  const ImVec2 textMin(24.f, 22.f);
+  drawList->AddRectFilled(ImVec2(textMin.x - 8.f, textMin.y - 6.f),
+                          ImVec2(textMin.x + textSize.x + 8.f, textMin.y + textSize.y + 6.f), shade);
+  drawList->AddText(textMin, telemetry.eyeShredderMismatchLatched != 0 ? magenta : cyan, label.c_str());
 }
 #endif
 
@@ -267,6 +311,7 @@ void end_frame() noexcept {
     return;
   }
 
+  draw_gx_channel_count_diagnostic();
   auto imguiDrawData = imgui::freeze();
 
   const auto& presentSource = webgpu::present_source();

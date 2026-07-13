@@ -21,6 +21,7 @@ protected:
     GXInit(nullptr, 0);
     aurora::gx::fifo::clear_buffer();
     aurora::gx::g_gxState = aurora::gx::GXState{};
+    aurora_reset_gx_channel_count_telemetry();
     aurora::gfx::depth_peek::testing::reset();
   }
 
