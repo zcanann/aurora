@@ -80,7 +80,7 @@ ECardResult CardGciFolder::openFile(const char* filename, FileHandle& handleOut)
     idx++;
   }
 
-  return ECardResult::NOCARD;
+  return ECardResult::NOFILE;
 }
 
 ECardResult CardGciFolder::openFile(uint32_t fileno, FileHandle& handleOut) {
@@ -94,7 +94,7 @@ ECardResult CardGciFolder::openFile(uint32_t fileno, FileHandle& handleOut) {
     return ECardResult::READY;
   }
 
-  return ECardResult::NOCARD;
+  return ECardResult::NOFILE;
 }
 
 ECardResult CardGciFolder::createFile(const char* filename, size_t size, FileHandle& handleOut) {
