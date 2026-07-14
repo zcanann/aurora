@@ -259,7 +259,10 @@ const AuroraEvent* poll_events() {
   SDL_Event event;
   // Clear out the previous scroll values to prevent ghost input
   input::set_mouse_scroll(0, 0);
-  if (is_paused()) {
+  // A simulation-only client intentionally keeps its SDL window hidden. It
+  // must continue polling without blocking even though ordinary interactive
+  // hidden/minimized windows pause in SDL_WaitEvent.
+  if (!g_config.disablePresentation && is_paused()) {
     ZoneScopedN("SDL_WaitEvent (paused)");
     if (SDL_WaitEvent(&event)) {
       process_event(event);
