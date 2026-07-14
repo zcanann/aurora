@@ -33,6 +33,14 @@ TEST(DVDStubs, StructSizes) {
 
 TEST(DVDStubs, InitWithoutDisc) { DVDInit(); }
 
+TEST(DVDStubs, SynchronousModeDefaultsOffAndCanBeConfiguredBeforeOpen) {
+  EXPECT_FALSE(aurora_dvd_is_synchronous());
+  aurora_dvd_set_synchronous(true);
+  EXPECT_TRUE(aurora_dvd_is_synchronous());
+  aurora_dvd_set_synchronous(false);
+  EXPECT_FALSE(aurora_dvd_is_synchronous());
+}
+
 TEST(DVDStubs, GetDriveStatus) { EXPECT_EQ(DVDGetDriveStatus(), DVD_STATE_NO_DISK); }
 
 TEST(DVDStubs, Reset) { DVDReset(); }
@@ -291,6 +299,50 @@ TEST_F(DVDDiscTest, DiskID) {
     }
   }
   EXPECT_TRUE(hasGameName);
+}
+
+class DVDSynchronousDiscTest : public ::testing::Test {
+protected:
+  static void SetUpTestSuite() {
+    aurora_dvd_set_synchronous(true);
+    ASSERT_TRUE(aurora_dvd_open(DVD_TEST_IMAGE));
+    DVDInit();
+  }
+
+  static void TearDownTestSuite() {
+    aurora_dvd_close();
+    aurora_dvd_set_synchronous(false);
+  }
+};
+
+static bool s_synchronousReadCallbackCalled;
+
+TEST_F(DVDSynchronousDiscTest, AsyncApiCompletesBeforeReturning) {
+  char fileName[256] = {};
+  if (findFirstRootFile(fileName, sizeof(fileName)) < 0) {
+    GTEST_SKIP() << "No files in root directory";
+  }
+
+  DVDFileInfo fi{};
+  ASSERT_EQ(DVDOpen(fileName, &fi), TRUE);
+
+  const u32 readSize = fi.length < 32 ? fi.length : 32;
+  alignas(32) u8 buf[32] = {};
+  s_synchronousReadCallbackCalled = false;
+  const BOOL ok = DVDReadAsyncPrio(
+      &fi, buf, static_cast<s32>(readSize), 0,
+      [](s32 result, DVDFileInfo*) {
+        EXPECT_GE(result, 0);
+        s_synchronousReadCallbackCalled = true;
+      },
+      2);
+
+  EXPECT_EQ(ok, TRUE);
+  EXPECT_TRUE(s_synchronousReadCallbackCalled);
+  EXPECT_EQ(DVDGetFileInfoStatus(&fi), DVD_STATE_END);
+  EXPECT_EQ(DVDGetTransferredSize(&fi), static_cast<s32>(readSize));
+
+  DVDClose(&fi);
 }
 
 #endif // DVD_TEST_IMAGE

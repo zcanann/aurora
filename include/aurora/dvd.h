@@ -16,6 +16,16 @@ extern "C" {
 bool aurora_dvd_open(const char* disc_path);
 
 /**
+ * Complete DVD commands on the calling thread instead of the host DVD worker.
+ * This is intended for deterministic, fixed-step automation. It must be set
+ * before opening a disc and leaves normal asynchronous behavior as the default.
+ */
+void aurora_dvd_set_synchronous(bool enabled);
+
+/** Returns whether calling-thread DVD completion is enabled. */
+bool aurora_dvd_is_synchronous(void);
+
+/**
  * Close the disc image and free all resources.
  */
 void aurora_dvd_close(void);

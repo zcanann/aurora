@@ -91,6 +91,7 @@ public:
 };
 
 CommandDataNod* s_disc;
+std::atomic_bool s_synchronousCommands = false;
 
 void clearState() {
   if (s_partition != nullptr) {
@@ -382,6 +383,11 @@ public:
   }
 
   void enqueue(DVDCommandBlock* block) {
+    if (s_synchronousCommands.load(std::memory_order_acquire)) {
+      execute(block);
+      return;
+    }
+
     bool executeNow = false;
     {
       std::lock_guard lk(m_mutex);
@@ -701,6 +707,17 @@ bool aurora_dvd_open(const char* disc_path) {
   s_initialized = true;
   s_worker.start();
   return true;
+}
+
+void aurora_dvd_set_synchronous(const bool enabled) {
+  // Changing dispatch policy while a disc is open could reorder already queued
+  // work. Automation configures this once, before aurora_dvd_open.
+  ASSERTMSGLINE(0, !s_initialized, "aurora_dvd_set_synchronous() must be called before opening a disc");
+  s_synchronousCommands.store(enabled, std::memory_order_release);
+}
+
+bool aurora_dvd_is_synchronous(void) {
+  return s_synchronousCommands.load(std::memory_order_acquire);
 }
 
 void aurora_dvd_close(void) {
