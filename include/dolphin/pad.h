@@ -239,6 +239,12 @@ void PADClearAutomationStatus(u32 port);
 void PADClearAllAutomationStatus();
 
 /**
+ * End automation ownership and suppress currently held live buttons/triggers
+ * until they are released. The next physical press then produces a clean edge.
+ */
+void PADPrepareAutomationHandoff();
+
+/**
  * Set the default controller mapping used.
  *
  * Must be called before PADInit.

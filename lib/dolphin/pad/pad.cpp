@@ -966,6 +966,11 @@ void PADClearAllAutomationStatus() {
   g_automationPadActive.fill(false);
 }
 
+void PADPrepareAutomationHandoff() {
+  PADClearAllAutomationStatus();
+  g_suppressHeldOnRead = true;
+}
+
 void PADControlMotor(const u32 chan, const u32 cmd) {
   const auto controller = aurora::input::get_controller_for_player(chan);
   if (should_use_device_rumble(chan, controller)) {
