@@ -208,7 +208,13 @@ AuroraInfo initialize(int argc, char* argv[], const AuroraConfig& config) noexce
   ASSERT(window::create_renderer(), "Failed to initialize SDL renderer: {}", SDL_GetError());
 #endif
 
-  window::show_window();
+  // Simulation-only callers still need SDL's hidden window as an internal
+  // size/event anchor, but must not create a visible desktop or taskbar
+  // surface. The disablePresentation frame path does not acquire a swapchain
+  // and deliberately bypasses visibility/focus pausing.
+  if (!g_config.disablePresentation) {
+    window::show_window();
+  }
 
 #ifdef AURORA_ENABLE_GX
   gfx::initialize();
