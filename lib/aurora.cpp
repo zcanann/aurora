@@ -212,8 +212,8 @@ AuroraInfo initialize(int argc, char* argv[], const AuroraConfig& config) noexce
   // size/event anchor, but must not create a visible desktop or taskbar
   // surface. The disablePresentation frame path does not acquire a swapchain
   // and deliberately bypasses visibility/focus pausing.
-  if (!g_config.disablePresentation) {
-    window::show_window();
+  if (!g_config.disablePresentation && !g_config.startHidden) {
+    window::show_window(false);
   }
 
 #ifdef AURORA_ENABLE_GX
@@ -497,6 +497,7 @@ void aurora_shutdown() { aurora::shutdown(); }
 const AuroraEvent* aurora_update() { return aurora::update(); }
 bool aurora_begin_frame() { return aurora::begin_frame(); }
 void aurora_end_frame() { aurora::end_frame(); }
+bool aurora_show_window() { return aurora::window::show_window(true); }
 AuroraBackend aurora_get_backend() { return aurora::g_config.desiredBackend; }
 const AuroraBackend* aurora_get_available_backends(size_t* count) {
   if (count != nullptr) {

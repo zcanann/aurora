@@ -33,7 +33,7 @@ void shutdown();
 bool create_window(AuroraBackend backend);
 bool create_renderer();
 void destroy_window();
-void show_window();
+bool show_window(bool raise);
 AuroraWindowSize get_window_size();
 const AuroraEvent* poll_events();
 void set_automation_input_quarantine(bool value);

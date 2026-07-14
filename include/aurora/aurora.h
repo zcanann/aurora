@@ -89,6 +89,11 @@ typedef struct {
   uint16_t maxTextureAnisotropy;
   bool vsync;
   bool startFullscreen;
+  /*
+   * Create a presentation-capable window without showing it. Frames continue
+   * to execute while initially hidden until aurora_show_window() succeeds.
+   */
+  bool startHidden;
   bool allowJoystickBackgroundEvents;
   bool pauseOnFocusLost;
   bool allowTextureDumps;
@@ -136,6 +141,8 @@ void aurora_shutdown();
 const AuroraEvent* aurora_update();
 bool aurora_begin_frame();
 void aurora_end_frame();
+/* Must be called from Aurora's main SDL/window thread. */
+bool aurora_show_window();
 
 void aurora_set_log_level(AuroraLogLevel level);
 void aurora_set_pause_on_focus_lost(bool value);

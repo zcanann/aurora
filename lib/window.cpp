@@ -53,6 +53,7 @@ std::atomic_bool g_surfaceReady = true;
 #endif
 bool g_lastPaused = false;
 bool g_gotFocus = false;
+bool g_allowInitiallyHiddenFrames = false;
 
 bool operator==(const AuroraWindowSize& lhs, const AuroraWindowSize& rhs) {
   return lhs.width == rhs.width && lhs.height == rhs.height && lhs.fb_width == rhs.fb_width &&
@@ -289,6 +290,7 @@ const AuroraEvent* poll_events() {
 }
 
 bool create_window(AuroraBackend backend) {
+  g_allowInitiallyHiddenFrames = g_config.startHidden;
   SDL_WindowFlags flags = SDL_WINDOW_HIGH_PIXEL_DENSITY;
 #if TARGET_OS_IOS || TARGET_OS_TV
   flags |= SDL_WINDOW_FULLSCREEN;
@@ -371,10 +373,21 @@ void destroy_window() {
   }
 }
 
-void show_window() {
-  if (g_window != nullptr) {
-    TRY_WARN(SDL_ShowWindow(g_window), "Failed to show window: {}", SDL_GetError());
+bool show_window(const bool raise) {
+  if (g_window == nullptr) {
+    return false;
   }
+  if (!SDL_ShowWindow(g_window)) {
+    Log.warn("Failed to show window: {}", SDL_GetError());
+    return false;
+  }
+  // A runtime transition can explicitly ask the window manager to foreground
+  // the newly visible window. Ordinary initialization preserves its existing
+  // show-only behavior.
+  if (raise && !SDL_RaiseWindow(g_window)) {
+    Log.warn("Failed to raise shown window: {}", SDL_GetError());
+  }
+  return true;
 }
 
 bool initialize() {
@@ -464,7 +477,12 @@ bool is_paused() noexcept {
   }
   const auto flags = SDL_GetWindowFlags(g_window);
   if ((flags & SDL_WINDOW_HIDDEN) != 0u) {
-    return true;
+    return !g_allowInitiallyHiddenFrames;
+  }
+  if (g_allowInitiallyHiddenFrames) {
+    // SDL_ShowWindow has become observable. Future user-driven hiding should
+    // retain the ordinary paused-window behavior.
+    g_allowInitiallyHiddenFrames = false;
   }
   // Wait until the window has received focus before respecting pauseOnFocusLost
   if (!g_gotFocus) {
