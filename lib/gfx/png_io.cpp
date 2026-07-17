@@ -107,4 +107,45 @@ load_png_file(const std::filesystem::path& path) noexcept {
   }
   return parse_png_bytes(*bytes);
 }
+
+bool encode_rgba8_png(uint32_t width, uint32_t height, ArrayRef<uint8_t> pixels,
+                      std::vector<uint8_t>& output, std::string& error) noexcept {
+  output.clear();
+  error.clear();
+  if (width == 0 || height == 0 ||
+      static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4 != pixels.size()) {
+    error = "invalid RGBA8 image dimensions";
+    return false;
+  }
+
+  png_image image{};
+  image.version = PNG_IMAGE_VERSION;
+  image.width = width;
+  image.height = height;
+  image.format = PNG_FORMAT_RGBA;
+
+  png_alloc_size_t encodedSize = 0;
+  if (!png_image_write_to_memory(&image, nullptr, &encodedSize, 0, pixels.data(), 0, nullptr)) {
+    error = image.message;
+    png_image_free(&image);
+    return false;
+  }
+
+  try {
+    output.resize(encodedSize);
+  } catch (const std::exception& exception) {
+    error = exception.what();
+    png_image_free(&image);
+    return false;
+  }
+  if (!png_image_write_to_memory(&image, output.data(), &encodedSize, 0, pixels.data(), 0, nullptr)) {
+    error = image.message;
+    output.clear();
+    png_image_free(&image);
+    return false;
+  }
+  output.resize(encodedSize);
+  png_image_free(&image);
+  return true;
+}
 }

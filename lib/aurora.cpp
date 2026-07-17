@@ -2,6 +2,7 @@
 
 #ifdef AURORA_ENABLE_GX
 #include "gfx/common.hpp"
+#include "gfx/frame_capture.hpp"
 #include "gfx/render_worker.hpp"
 #include "gx/fifo.hpp"
 #include "imgui.hpp"
@@ -24,6 +25,10 @@
 
 #include "system_info.hpp"
 #include "tracy/Tracy.hpp"
+
+#include <algorithm>
+#include <cstring>
+#include <string_view>
 
 namespace aurora {
 AuroraConfig g_config;
@@ -253,6 +258,7 @@ AuroraInfo initialize(int argc, char* argv[], const AuroraConfig& config) noexce
 void shutdown() noexcept {
 #ifdef AURORA_ENABLE_GX
   gfx::render_worker::synchronize();
+  gfx::frame_capture::reset();
 #ifdef AURORA_ENABLE_RMLUI
   rmlui::shutdown();
 #endif
@@ -305,10 +311,12 @@ void end_frame() noexcept {
 #ifdef AURORA_ENABLE_GX
   gx::fifo::drain();
   gfx::finish();
+  const bool captureThisFrame = gfx::frame_capture::pending();
 
   if (g_config.disablePresentation) {
     imgui::discard_frame();
     gfx::end_frame([](wgpu::CommandEncoder& encoder) {
+      gfx::frame_capture::encode_if_requested(encoder);
       webgpu::gpu_prof::frame_end(encoder);
       const wgpu::CommandBufferDescriptor cmdBufDescriptor{.label = "Headless frame command buffer"};
       const auto buffer = encoder.Finish(&cmdBufDescriptor);
@@ -318,7 +326,11 @@ void end_frame() noexcept {
       }
       webgpu::gpu_prof::after_submit();
       gfx::after_submit();
+      gfx::frame_capture::after_submit_and_wait();
     });
+    if (captureThisFrame) {
+      gfx::synchronize();
+    }
     return;
   }
 
@@ -342,6 +354,7 @@ void end_frame() noexcept {
 
   gfx::end_frame([rmlBindGroup = std::move(rmlBindGroup), rmlOverlay, viewport,
                   imguiDrawData = std::move(imguiDrawData)](wgpu::CommandEncoder& encoder) {
+    gfx::frame_capture::encode_if_requested(encoder);
     wgpu::Texture currentTexture;
     wgpu::TextureView currentView;
     auto surfaceStatus = wgpu::SurfaceGetCurrentTextureStatus::Error;
@@ -471,6 +484,7 @@ void end_frame() noexcept {
       }
     }
     gfx::after_submit();
+    gfx::frame_capture::after_submit_and_wait();
 
     TracyPlotConfig("aurora: lastVertSize", tracy::PlotFormatType::Memory, false, true, 0);
     TracyPlotConfig("aurora: lastUniformSize", tracy::PlotFormatType::Memory, false, true, 0);
@@ -488,6 +502,9 @@ void end_frame() noexcept {
     TracyPlot("aurora: lastStorageSize", static_cast<int64_t>(gfx::g_stats.lastStorageSize));
     TracyPlot("aurora: lastTextureUploadSize", static_cast<int64_t>(gfx::g_stats.lastTextureUploadSize));
   });
+  if (captureThisFrame) {
+    gfx::synchronize();
+  }
 
 #endif
 }
@@ -503,6 +520,31 @@ const AuroraEvent* aurora_update() { return aurora::update(); }
 bool aurora_begin_frame() { return aurora::begin_frame(); }
 bool aurora_begin_retained_frame() { return aurora::begin_frame(true); }
 void aurora_end_frame() { aurora::end_frame(); }
+#ifdef AURORA_ENABLE_GX
+bool aurora_capture_next_frame_png(const char* path, uint32_t width, uint32_t height) {
+  return aurora::gfx::frame_capture::request(path, width, height);
+}
+AuroraFrameCaptureStatus aurora_get_frame_capture_status() {
+  return aurora::gfx::frame_capture::status();
+}
+size_t aurora_copy_frame_capture_error(char* destination, size_t capacity) {
+  return aurora::gfx::frame_capture::copy_error(destination, capacity);
+}
+#else
+bool aurora_capture_next_frame_png(const char*, uint32_t, uint32_t) { return false; }
+AuroraFrameCaptureStatus aurora_get_frame_capture_status() {
+  return AURORA_FRAME_CAPTURE_UNSUPPORTED;
+}
+size_t aurora_copy_frame_capture_error(char* destination, size_t capacity) {
+  constexpr std::string_view error = "frame capture requires AURORA_ENABLE_GX";
+  if (destination != nullptr && capacity > 0) {
+    const size_t copied = std::min(error.size(), capacity - 1);
+    std::memcpy(destination, error.data(), copied);
+    destination[copied] = '\0';
+  }
+  return error.size();
+}
+#endif
 bool aurora_show_window() { return aurora::window::show_window(true); }
 AuroraBackend aurora_get_backend() { return aurora::g_config.desiredBackend; }
 const AuroraBackend* aurora_get_available_backends(size_t* count) {

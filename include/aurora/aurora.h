@@ -37,6 +37,17 @@ typedef enum {
   LOG_FATAL,
 } AuroraLogLevel;
 
+typedef enum {
+  AURORA_FRAME_CAPTURE_IDLE,
+  AURORA_FRAME_CAPTURE_PENDING,
+  AURORA_FRAME_CAPTURE_SUCCEEDED,
+  AURORA_FRAME_CAPTURE_INVALID_ARGUMENT,
+  AURORA_FRAME_CAPTURE_UNSUPPORTED,
+  AURORA_FRAME_CAPTURE_GPU_ERROR,
+  AURORA_FRAME_CAPTURE_PNG_ERROR,
+  AURORA_FRAME_CAPTURE_IO_ERROR,
+} AuroraFrameCaptureStatus;
+
 typedef struct {
   int32_t x;
   int32_t y;
@@ -153,6 +164,19 @@ bool aurora_begin_frame();
  */
 bool aurora_begin_retained_frame();
 void aurora_end_frame();
+/*
+ * Captures the resolved EFB produced by the next aurora_end_frame call. The
+ * requested output size is generated on the CPU after readback. A successful
+ * request makes aurora_end_frame wait until the PNG has been atomically
+ * written, so the status is terminal when aurora_end_frame returns.
+ *
+ * Capture is unavailable on the null backend. The UTF-8 output path is copied
+ * by this call and its parent directory must already exist.
+ */
+bool aurora_capture_next_frame_png(const char* path, uint32_t width, uint32_t height);
+AuroraFrameCaptureStatus aurora_get_frame_capture_status();
+/* Returns the full error length, excluding the terminating null byte. */
+size_t aurora_copy_frame_capture_error(char* destination, size_t capacity);
 /* Must be called from Aurora's main SDL/window thread. */
 bool aurora_show_window();
 

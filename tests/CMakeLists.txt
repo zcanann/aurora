@@ -84,6 +84,13 @@ if (AURORA_ENABLE_GX)
     TracyClient
   )
   gtest_discover_tests(render_worker_tests)
+
+  add_executable(frame_capture_tests frame_capture_test.cpp)
+  target_include_directories(frame_capture_tests PRIVATE ../include ../lib)
+  target_compile_definitions(frame_capture_tests PRIVATE AURORA TARGET_PC)
+  target_link_libraries(frame_capture_tests PRIVATE aurora::gx aurora::vi gtest gtest_main)
+  aurora_copy_runtime_dlls(frame_capture_tests)
+  gtest_discover_tests(frame_capture_tests)
 endif () # AURORA_ENABLE_GX
 
 # DVD API tests
