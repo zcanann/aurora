@@ -1587,7 +1587,7 @@ static std::optional<size_t> acquire_mapped_staging_buffer() {
   }
 }
 
-bool begin_frame() {
+bool begin_frame(bool retainEfb) {
   ZoneScoped;
   // pace_frame_start();
   const size_t frameSlot = acquire_frame_slot();
@@ -1633,6 +1633,10 @@ bool begin_frame() {
   set_efb_targets(pass);
   pass.clearColorValue = gx::g_gxState.clearColor;
   pass.clearDepthValue = gx::clear_depth_value();
+  if (retainEfb) {
+    pass.clearColor = false;
+    pass.clearDepth = false;
+  }
   g_currentRenderPass = 0;
   // Refresh render viewport/scissor from logical in case FB size changed
   g_cachedViewport = gx::map_logical_viewport(gx::g_gxState.logicalViewport);

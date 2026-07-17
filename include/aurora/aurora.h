@@ -147,6 +147,11 @@ AuroraInfo aurora_initialize(int argc, char* argv[], const AuroraConfig* config)
 void aurora_shutdown();
 const AuroraEvent* aurora_update();
 bool aurora_begin_frame();
+/*
+ * Begins a frame while preserving the existing EFB color and depth contents.
+ * This permits UI-only updates over the last rendered game frame.
+ */
+bool aurora_begin_retained_frame();
 void aurora_end_frame();
 /* Must be called from Aurora's main SDL/window thread. */
 bool aurora_show_window();

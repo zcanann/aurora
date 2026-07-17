@@ -221,7 +221,7 @@ enum class ShaderType : uint8_t {
 void initialize();
 void shutdown();
 
-bool begin_frame();
+bool begin_frame(bool retainEfb = false);
 void finish();
 void end_frame(EndFrameCallback callback);
 uint32_t current_frame() noexcept;

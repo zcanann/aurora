@@ -273,7 +273,7 @@ const AuroraEvent* update() noexcept {
   return window::poll_events();
 }
 
-bool begin_frame() noexcept {
+bool begin_frame(bool retainEfb = false) noexcept {
   ZoneScoped;
 #ifdef AURORA_ENABLE_GX
   if (!g_config.disablePresentation) {
@@ -293,7 +293,7 @@ bool begin_frame() noexcept {
   }
 
   imgui::new_frame(window::get_window_size());
-  if (!gfx::begin_frame()) {
+  if (!gfx::begin_frame(retainEfb)) {
     return false;
   }
 #endif
@@ -501,6 +501,7 @@ AuroraInfo aurora_initialize(int argc, char* argv[], const AuroraConfig* config)
 void aurora_shutdown() { aurora::shutdown(); }
 const AuroraEvent* aurora_update() { return aurora::update(); }
 bool aurora_begin_frame() { return aurora::begin_frame(); }
+bool aurora_begin_retained_frame() { return aurora::begin_frame(true); }
 void aurora_end_frame() { aurora::end_frame(); }
 bool aurora_show_window() { return aurora::window::show_window(true); }
 AuroraBackend aurora_get_backend() { return aurora::g_config.desiredBackend; }
