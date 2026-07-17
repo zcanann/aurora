@@ -36,7 +36,7 @@ constexpr int CACHE_SCHEMA = 2;
 constexpr uint64_t VacuumPrunePercentThreshold = 25;
 
 static std::filesystem::path cache_path() {
-  return std::filesystem::path{reinterpret_cast<const char8_t*>(g_config.cachePath)} / "dawn_cache.db";
+  return std::filesystem::path{reinterpret_cast<const char8_t*>(g_config.rendererCachePath)} / "dawn_cache.db";
 }
 
 static void init_abort() {
@@ -109,6 +109,7 @@ static bool cache_init_core() {
     Log.error("Failed to open database: {}", sqlite3_errmsg(db));
     return false;
   }
+  sqlite3_busy_timeout(db, 5000);
 
   // WAL mode + NORMAL = no need for disk syncs, consistent but not durable is fine.
   ret = sqlite::exec(db, "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;");

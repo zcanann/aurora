@@ -83,6 +83,8 @@ typedef struct {
   const char* appName;
   const char* userPath;
   const char* cachePath;
+  /* Renderer pipeline manifests and backend-compiled shader objects only. */
+  const char* rendererCachePath;
   const char* resourcesPath;
   AuroraBackend desiredBackend;
   uint32_t msaa;
@@ -103,6 +105,11 @@ typedef struct {
    * swapchain image. Intended for callers running simulation-only workloads.
    */
   bool disablePresentation;
+  /*
+   * Compile every pipeline before accepting the draw that first references it.
+   * This may increase wall-clock time, but prevents frames with omitted draws.
+   */
+  bool blockOnPipelineCompilation;
   int32_t windowPosX;
   int32_t windowPosY;
   uint32_t windowWidth;

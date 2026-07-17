@@ -152,6 +152,11 @@ AuroraInfo initialize(int argc, char* argv[], const AuroraConfig& config) noexce
   } else {
     g_config.cachePath = strdup(g_config.cachePath);
   }
+  if (g_config.rendererCachePath == nullptr) {
+    g_config.rendererCachePath = strdup(g_config.cachePath);
+  } else {
+    g_config.rendererCachePath = strdup(g_config.rendererCachePath);
+  }
   if (g_config.resourcesPath == nullptr) {
     g_config.resourcesPath = SDL_GetBasePath();
   } else {
