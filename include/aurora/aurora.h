@@ -179,6 +179,13 @@ AuroraFrameCaptureStatus aurora_get_frame_capture_status();
 size_t aurora_copy_frame_capture_error(char* destination, size_t capacity);
 /* Must be called from Aurora's main SDL/window thread. */
 bool aurora_show_window();
+/*
+ * Enables or suppresses host swapchain presentation without changing the
+ * active graphics backend or discarding emulated GPU work. Must be called on
+ * Aurora's main thread. A caller enabling presentation remains responsible
+ * for showing the window.
+ */
+void aurora_set_presentation_enabled(bool enabled);
 
 void aurora_set_log_level(AuroraLogLevel level);
 void aurora_set_pause_on_focus_lost(bool value);

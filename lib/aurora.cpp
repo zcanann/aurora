@@ -546,6 +546,15 @@ size_t aurora_copy_frame_capture_error(char* destination, size_t capacity) {
 }
 #endif
 bool aurora_show_window() { return aurora::window::show_window(true); }
+
+void aurora_set_presentation_enabled(const bool enabled) {
+  aurora::g_config.disablePresentation = !enabled;
+#ifdef AURORA_ENABLE_GX
+  if (!enabled) {
+    aurora::webgpu::release_surface();
+  }
+#endif
+}
 AuroraBackend aurora_get_backend() { return aurora::g_config.desiredBackend; }
 const AuroraBackend* aurora_get_available_backends(size_t* count) {
   if (count != nullptr) {
