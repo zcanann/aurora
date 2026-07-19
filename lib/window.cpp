@@ -1,5 +1,7 @@
 #include "window.hpp"
 
+#include "automation_input_policy.hpp"
+
 #ifdef AURORA_ENABLE_GX
 #include "imgui.hpp"
 #include "webgpu/gpu.hpp"
@@ -156,10 +158,14 @@ bool is_user_input_event(const Uint32 type) {
 void process_event(SDL_Event& event) {
   const bool quarantinedInput =
       g_automationInputQuarantine.load(std::memory_order_relaxed) && is_user_input_event(event.type);
-  if (!quarantinedInput) {
 #ifdef AURORA_ENABLE_GX
+  // Keep the automation boundary closed to game-facing input while allowing a
+  // deliberately narrow host-only path for the debug-rendering overlay.
+  if (!quarantinedInput || is_automation_debug_ui_key_event(event)) {
     imgui::process_event(event);
+  }
 #endif
+  if (!quarantinedInput) {
 #ifdef AURORA_ENABLE_RMLUI
     rmlui::handle_event(event);
 #endif
