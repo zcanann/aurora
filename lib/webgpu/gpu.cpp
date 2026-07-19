@@ -978,7 +978,10 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
           }
         });
     deviceDescriptor.SetDeviceLostCallback(
-        wgpu::CallbackMode::AllowSpontaneous,
+        // Dispatch on the thread which pumps Instance::ProcessEvents. Dawn's
+        // spontaneous callback may race process teardown and log after the
+        // host's synchronization primitives have begun destruction.
+        wgpu::CallbackMode::AllowProcessEvents,
         [](const wgpu::Device& device, wgpu::DeviceLostReason reason, wgpu::StringView message) {
           if (g_initialized) {
             FATAL("Device lost: {}", message);
@@ -1064,6 +1067,11 @@ void shutdown() {
   g_queue = {};
   g_surface = {};
   g_device = {};
+  // Device destruction queues the expected device-lost callback. Drain it
+  // synchronously while both the Instance and logging substrate are alive.
+  if (g_instance) {
+    g_instance.ProcessEvents();
+  }
   g_adapter = {};
   g_instance = {};
   cache_shutdown();
