@@ -306,7 +306,10 @@ void complete_slot(size_t slotIdx, wgpu::MapAsyncStatus status, wgpu::StringView
 } // namespace
 
 void initialize() {
-  if (!webgpu::g_hasCoreFeatures) {
+  // The null backend has no meaningful EFB depth. Its compute output is
+  // synthetic backend data, so exposing it through GXPeekZ makes headless
+  // simulation depend on asynchronous render-worker timing.
+  if (!webgpu::g_hasCoreFeatures || webgpu::g_backendType == wgpu::BackendType::Null) {
     return;
   }
   g_bindGroupLayout = create_bind_group_layout("Depth Peek Bind Group Layout");
