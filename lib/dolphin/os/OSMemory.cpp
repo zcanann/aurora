@@ -146,3 +146,14 @@ u32 OSGetPhysicalMemSize() {
   const auto info = static_cast<OSBootInfo*>(OSPhysicalToCached(0));
   return info->memorySize;
 }
+
+void* AuroraGetMEM1StorageAddress() {
+  return MEM1Start;
+}
+
+u32 AuroraGetMEM1StorageSize() {
+  if (MEM1Start == nullptr || MEM1End == nullptr) {
+    return 0;
+  }
+  return static_cast<u32>(static_cast<u8*>(MEM1End) - static_cast<u8*>(MEM1Start));
+}

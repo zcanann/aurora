@@ -58,6 +58,19 @@ void ARClear(u32 flag);
  */
 void* ARGetStorageAddress();
 
+#ifdef TARGET_PC
+typedef struct AuroraARState {
+    BOOL initialized;
+    u32 stackPointer;
+    u32 freeBlocks;
+    uintptr_t blockLengthAddress;
+} AuroraARState;
+
+/** Captures/restores ARAM allocator metadata; ARAM bytes are copied separately. */
+BOOL ARCaptureState(AuroraARState* state);
+BOOL ARRestoreState(const AuroraARState* state);
+#endif
+
 // ARQ
 void ARQInit(void);
 void ARQReset(void);

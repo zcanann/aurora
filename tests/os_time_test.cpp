@@ -39,6 +39,29 @@ TEST_F(DeterministicTimeTest, RationalRemainderDoesNotDrift) {
     EXPECT_EQ(OSGetTime(), static_cast<OSTime>(OS_TIMER_CLOCK) * 3);
 }
 
+TEST_F(DeterministicTimeTest, SnapshotRestoresFractionalPhase) {
+    ASSERT_TRUE(AuroraEnableDeterministicTime(17, 7, 3));
+    ASSERT_TRUE(AuroraAdvanceDeterministicTime(3));
+
+    AuroraDeterministicTimeState snapshot{};
+    ASSERT_TRUE(AuroraCaptureDeterministicTimeState(&snapshot));
+    ASSERT_TRUE(AuroraAdvanceDeterministicTime(11));
+    const OSTime expectedAfterTail = OSGetTime();
+
+    ASSERT_TRUE(AuroraRestoreDeterministicTimeState(&snapshot));
+    ASSERT_TRUE(AuroraAdvanceDeterministicTime(11));
+    EXPECT_EQ(OSGetTime(), expectedAfterTail);
+}
+
+TEST_F(DeterministicTimeTest, RejectsMalformedSnapshotWithoutChangingTime) {
+    ASSERT_TRUE(AuroraEnableDeterministicTime(29, 30, 1));
+    AuroraDeterministicTimeState snapshot{};
+    ASSERT_TRUE(AuroraCaptureDeterministicTimeState(&snapshot));
+    snapshot.stepTickDenominator = 0;
+    EXPECT_FALSE(AuroraRestoreDeterministicTimeState(&snapshot));
+    EXPECT_EQ(OSGetTime(), 29);
+}
+
 TEST_F(DeterministicTimeTest, ResetAlsoResetsFractionalPhase) {
     ASSERT_TRUE(AuroraEnableDeterministicTime(10, 7, 1));
     ASSERT_TRUE(AuroraAdvanceDeterministicTime(1));

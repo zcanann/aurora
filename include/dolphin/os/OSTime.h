@@ -30,6 +30,18 @@ void AuroraDisableDeterministicTime(void);
 BOOL AuroraIsDeterministicTimeEnabled(void);
 BOOL AuroraResetDeterministicTime(OSTime ticks);
 BOOL AuroraAdvanceDeterministicTime(u64 logicalTicks);
+
+typedef struct AuroraDeterministicTimeState {
+    BOOL enabled;
+    OSTime ticks;
+    u64 stepTickNumerator;
+    u32 stepTickDenominator;
+    u64 remainder;
+} AuroraDeterministicTimeState;
+
+/** Captures/restores the complete logical-clock phase for same-process checkpoints. */
+BOOL AuroraCaptureDeterministicTimeState(AuroraDeterministicTimeState* state);
+BOOL AuroraRestoreDeterministicTimeState(const AuroraDeterministicTimeState* state);
 #endif
 
 #define OSDiffTick(tick1, tick0) ((s32)(tick1) - (s32)(tick0))

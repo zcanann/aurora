@@ -113,3 +113,30 @@ void ARQInit() {
 void* ARGetStorageAddress() {
   return sAramBuffer;
 }
+
+BOOL ARCaptureState(AuroraARState* state) {
+  if (state == nullptr) {
+    return FALSE;
+  }
+  state->initialized = AR_init_flag;
+  state->stackPointer = AR_StackPointer;
+  state->freeBlocks = AR_FreeBlocks;
+  state->blockLengthAddress = reinterpret_cast<uintptr_t>(AR_BlockLength);
+  return TRUE;
+}
+
+BOOL ARRestoreState(const AuroraARState* state) {
+  if (state == nullptr || state->initialized != AR_init_flag) {
+    return FALSE;
+  }
+  if (state->initialized) {
+    if (sAramBuffer == nullptr || state->stackPointer < ARAM_STACK_START ||
+        state->stackPointer > aurora::g_config.mem2Size || state->blockLengthAddress == 0) {
+      return FALSE;
+    }
+  }
+  AR_StackPointer = state->stackPointer;
+  AR_FreeBlocks = state->freeBlocks;
+  AR_BlockLength = reinterpret_cast<u32*>(state->blockLengthAddress);
+  return TRUE;
+}

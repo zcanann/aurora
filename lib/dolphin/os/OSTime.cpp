@@ -236,6 +236,36 @@ BOOL AuroraAdvanceDeterministicTime(const u64 logicalTicks) {
     return TRUE;
 }
 
+BOOL AuroraCaptureDeterministicTimeState(AuroraDeterministicTimeState* const state) {
+    if (state == nullptr) {
+        return FALSE;
+    }
+    std::lock_guard lock(g_deterministicClock.writerMutex);
+    state->enabled = g_deterministicClock.enabled.load(std::memory_order_relaxed) ? TRUE : FALSE;
+    state->ticks = g_deterministicClock.ticks.load(std::memory_order_relaxed);
+    state->stepTickNumerator = g_deterministicClock.stepTickNumerator;
+    state->stepTickDenominator = g_deterministicClock.stepTickDenominator;
+    state->remainder = g_deterministicClock.remainder;
+    return TRUE;
+}
+
+BOOL AuroraRestoreDeterministicTimeState(const AuroraDeterministicTimeState* const state) {
+    if (state == nullptr || state->stepTickDenominator == 0 ||
+        state->remainder >= state->stepTickDenominator) {
+        return FALSE;
+    }
+    std::lock_guard lock(g_deterministicClock.writerMutex);
+    // Publish disabled while the multi-field state is replaced, then expose the
+    // restored clock only after every non-atomic field is coherent.
+    g_deterministicClock.enabled.store(false, std::memory_order_release);
+    g_deterministicClock.stepTickNumerator = state->stepTickNumerator;
+    g_deterministicClock.stepTickDenominator = state->stepTickDenominator;
+    g_deterministicClock.remainder = state->remainder;
+    g_deterministicClock.ticks.store(state->ticks, std::memory_order_release);
+    g_deterministicClock.enabled.store(state->enabled != FALSE, std::memory_order_release);
+    return TRUE;
+}
+
 void AuroraInitClock() {
   if (OSBaseAddress == 0) {
     return;

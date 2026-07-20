@@ -121,6 +121,11 @@ void* OSAllocFromArenaLo(u32 size, u32 align);
 void* OSAllocFromArenaHi(u32 size, u32 align);
 
 u32 OSGetPhysicalMemSize(void);
+#ifdef TARGET_PC
+/** Aurora extensions for explicit same-process emulated-memory checkpoints. */
+void* AuroraGetMEM1StorageAddress(void);
+u32 AuroraGetMEM1StorageSize(void);
+#endif
 
 void __OSPSInit(void);
 void __OSFPRInit(void);

@@ -153,3 +153,14 @@ target_include_directories(os_time_tests PRIVATE ../include)
 target_compile_definitions(os_time_tests PRIVATE AURORA TARGET_PC)
 target_link_libraries(os_time_tests PRIVATE gtest gtest_main fmt::fmt)
 gtest_discover_tests(os_time_tests)
+
+add_executable(ar_state_tests
+  ar_state_test.cpp
+  os_test_globals.cpp
+  ../lib/dolphin/AR.cpp
+  ../lib/logging.cpp
+)
+target_include_directories(ar_state_tests PRIVATE ../include ../lib)
+target_compile_definitions(ar_state_tests PRIVATE AURORA TARGET_PC)
+target_link_libraries(ar_state_tests PRIVATE gtest gtest_main fmt::fmt)
+gtest_discover_tests(ar_state_tests)
