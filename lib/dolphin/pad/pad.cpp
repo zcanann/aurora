@@ -966,6 +966,28 @@ void PADClearAllAutomationStatus() {
   g_automationPadActive.fill(false);
 }
 
+BOOL PADCaptureAutomationState(PADAutomationState* state) {
+  if (state == nullptr) {
+    return FALSE;
+  }
+  for (u32 port = 0; port < PAD_CHANMAX; ++port) {
+    state->status[port] = g_automationPadStatus[port];
+    state->active[port] = g_automationPadActive[port] ? TRUE : FALSE;
+  }
+  return TRUE;
+}
+
+BOOL PADRestoreAutomationState(const PADAutomationState* state) {
+  if (state == nullptr) {
+    return FALSE;
+  }
+  for (u32 port = 0; port < PAD_CHANMAX; ++port) {
+    g_automationPadStatus[port] = state->status[port];
+    g_automationPadActive[port] = state->active[port] != FALSE;
+  }
+  return TRUE;
+}
+
 void PADPrepareAutomationHandoff() {
   PADClearAllAutomationStatus();
   g_suppressHeldOnRead = true;

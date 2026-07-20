@@ -238,6 +238,15 @@ void PADSetAutomationStatus(u32 port, const PADStatus* status);
 void PADClearAutomationStatus(u32 port);
 void PADClearAllAutomationStatus();
 
+typedef struct PADAutomationState {
+  PADStatus status[PAD_CHANMAX];
+  BOOL active[PAD_CHANMAX];
+} PADAutomationState;
+
+/** Captures/restores the exclusive automation source for same-process checkpoints. */
+BOOL PADCaptureAutomationState(PADAutomationState* state);
+BOOL PADRestoreAutomationState(const PADAutomationState* state);
+
 /**
  * End automation ownership and suppress currently held live buttons/triggers
  * until they are released. The next physical press then produces a clean edge.
