@@ -102,6 +102,24 @@ void emit_loaded_tlut_metadata(const GXTlutObj_& obj, u32 idx) {
 } // namespace
 
 extern "C" {
+
+BOOL AuroraCaptureGXObjectIdentityState(AuroraGXObjectIdentityState* state) {
+  if (state == nullptr) {
+    return FALSE;
+  }
+  state->nextTexObjId = sNextTexObjId;
+  state->nextTlutObjId = sNextTlutObjId;
+  return TRUE;
+}
+
+BOOL AuroraRestoreGXObjectIdentityState(const AuroraGXObjectIdentityState* state) {
+  if (state == nullptr || state->nextTexObjId == 0 || state->nextTlutObjId == 0) {
+    return FALSE;
+  }
+  sNextTexObjId = state->nextTexObjId;
+  sNextTlutObjId = state->nextTlutObjId;
+  return TRUE;
+}
 void GXInitTexObj(GXTexObj* obj_, const void* data, u16 width, u16 height, GXTexFmt format, GXTexWrapMode wrapS,
                   GXTexWrapMode wrapT, GXBool mipmap) {
   auto* obj = reinterpret_cast<GXTexObj_*>(obj_);

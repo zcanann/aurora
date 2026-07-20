@@ -125,6 +125,14 @@ typedef enum _AuroraViewportPolicy {
   AURORA_VIEWPORT_NATIVE = 2,  // Use active framebuffer pixels directly
 } AuroraViewportPolicy;
 
+typedef struct _AuroraGXObjectIdentityState {
+  u32 nextTexObjId;
+  u32 nextTlutObjId;
+} AuroraGXObjectIdentityState;
+
+BOOL AuroraCaptureGXObjectIdentityState(AuroraGXObjectIdentityState* state);
+BOOL AuroraRestoreGXObjectIdentityState(const AuroraGXObjectIdentityState* state);
+
 /**
  * Configures content framebuffer sizing and how GXSetViewport/GXSetScissor parameters are applied to rendering.
  * When AURORA_VIEWPORT_NATIVE is used, GXSetTexCopySrc/GXSetTexCopyDst will use native framebuffer resolution.
