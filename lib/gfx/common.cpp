@@ -1487,7 +1487,9 @@ void initialize() {
     g_uniformBindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
   }
 
-  gx::initialize();
+  if (!g_config.discardGpuFrames) {
+    gx::initialize();
+  }
 #ifdef AURORA_ENABLE_RMLUI
   rmlui::initialize_pipeline();
 #endif
