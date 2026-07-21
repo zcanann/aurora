@@ -117,6 +117,14 @@ typedef struct {
    */
   bool disablePresentation;
   /*
+   * Retain the caller's CPU-side draw traversal and GX command generation, but
+   * discard the completed renderer packet without compiling frame pipelines,
+   * encoding GPU commands, or submitting a command buffer. This is stricter
+   * than disablePresentation and is intended only for audited simulation-only
+   * workloads.
+   */
+  bool discardGpuFrames;
+  /*
    * Compile every pipeline before accepting the draw that first references it.
    * This may increase wall-clock time, but prevents frames with omitted draws.
    */

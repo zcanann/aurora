@@ -13,6 +13,7 @@
 #include <SDL3/SDL_render.h>
 
 #include "internal.hpp"
+#include "gfx/common.hpp"
 #include "gfx/render_worker.hpp"
 #include "webgpu/gpu.hpp"
 #include "window.hpp"
@@ -242,6 +243,7 @@ static void enqueue_texture_upload(wgpu::Buffer buffer, wgpu::TexelCopyTextureIn
     };
     auto commandBuffer = encoder.Finish(&commandBufferDesc);
     webgpu::g_queue.Submit(1, &commandBuffer);
+    ++gfx::g_stats.submittedCommandBufferCount;
   });
 }
 

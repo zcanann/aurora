@@ -313,6 +313,14 @@ void end_frame() noexcept {
   gfx::finish();
   const bool captureThisFrame = gfx::frame_capture::pending();
 
+  if (g_config.discardGpuFrames) {
+    ASSERT(g_config.disablePresentation, "discardGpuFrames requires disablePresentation");
+    ASSERT(!captureThisFrame, "frame capture is unavailable while discarding GPU frames");
+    imgui::discard_frame();
+    gfx::discard_frame();
+    return;
+  }
+
   if (g_config.disablePresentation) {
     imgui::discard_frame();
     gfx::end_frame([](wgpu::CommandEncoder& encoder) {
@@ -323,6 +331,7 @@ void end_frame() noexcept {
       {
         ZoneScopedN("Queue Submit");
         g_queue.Submit(1, &buffer);
+        ++gfx::g_stats.submittedCommandBufferCount;
       }
       webgpu::gpu_prof::after_submit();
       gfx::after_submit();
@@ -439,6 +448,7 @@ void end_frame() noexcept {
     {
       ZoneScopedN("Queue Submit");
       g_queue.Submit(1, &buffer);
+      ++gfx::g_stats.submittedCommandBufferCount;
     }
     webgpu::gpu_prof::after_submit();
     if (canPresent && g_surface) {

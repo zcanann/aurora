@@ -224,6 +224,7 @@ void shutdown();
 bool begin_frame(bool retainEfb = false);
 void finish();
 void end_frame(EndFrameCallback callback);
+void discard_frame();
 uint32_t current_frame() noexcept;
 void render_pass(const wgpu::RenderPassEncoder& pass, uint32_t idx);
 void after_submit() noexcept;

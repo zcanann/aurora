@@ -26,6 +26,8 @@ typedef struct {
   uint32_t lastIndexSize;
   uint32_t lastStorageSize;
   uint32_t lastTextureUploadSize;
+  uint64_t submittedCommandBufferCount;
+  uint64_t discardedGpuFrameCount;
 } AuroraStats;
 
 const AuroraStats* aurora_get_stats();

@@ -614,6 +614,9 @@ static void enqueue_op(FramePacket& frame, size_t frameSlot, uint32_t opIndex) {
   if (opIndex >= frame.ops.size()) {
     return;
   }
+  if (g_config.discardGpuFrames) {
+    return;
+  }
   auto op = frame.ops[opIndex];
   render_worker::enqueue_encode_pass(frame.frameId, opIndex, [frameSlot, op = std::move(op)] {
     if (op.renderPass == nullptr && op.textureCopy == nullptr && op.encoderTask == nullptr) {
@@ -819,6 +822,9 @@ void push_draw_command(clear::DrawData data) {
 
 template <>
 PipelineRef pipeline_ref(const clear::PipelineConfig& config) {
+  if (g_config.discardGpuFrames) {
+    return xxh3_hash(config, static_cast<HashType>(ShaderType::Clear));
+  }
   return find_pipeline(ShaderType::Clear, config, [=] { return create_pipeline(config); });
 }
 
@@ -1325,12 +1331,18 @@ void push_draw_command(rmlui::DrawData data) {
 
 template <>
 PipelineRef pipeline_ref(const gx::PipelineConfig& config) {
+  if (g_config.discardGpuFrames) {
+    return xxh3_hash(config, static_cast<HashType>(ShaderType::GX));
+  }
   return find_pipeline(ShaderType::GX, config, [=] { return create_pipeline(config); });
 }
 
 #ifdef AURORA_ENABLE_RMLUI
 template <>
 PipelineRef pipeline_ref(const rmlui::PipelineConfig& config) {
+  if (g_config.discardGpuFrames) {
+    return xxh3_hash(config, static_cast<HashType>(ShaderType::Rml));
+  }
   return find_pipeline(ShaderType::Rml, config, [=] { return rmlui::create_pipeline(config); });
 }
 #endif
@@ -1477,7 +1489,9 @@ void initialize() {
 #ifdef AURORA_ENABLE_RMLUI
   rmlui::initialize_pipeline();
 #endif
-  initialize_pipeline_cache();
+  if (!g_config.discardGpuFrames) {
+    initialize_pipeline_cache();
+  }
 }
 
 void shutdown() {
@@ -1492,7 +1506,9 @@ void shutdown() {
     std::lock_guard lock{g_presentStatsMutex};
     g_presentTimes.clear();
   }
-  shutdown_pipeline_cache();
+  if (!g_config.discardGpuFrames) {
+    shutdown_pipeline_cache();
+  }
   depth_peek::shutdown();
   tex_copy_conv::shutdown();
   tex_palette_conv::shutdown();
@@ -1643,12 +1659,14 @@ bool begin_frame(bool retainEfb) {
   g_cachedScissor = gx::map_logical_scissor(gx::g_gxState.logicalScissor);
   push_command(CommandType::SetViewport, Command::Data{.setViewport = g_cachedViewport});
   push_command(CommandType::SetScissor, Command::Data{.setScissor = g_cachedScissor});
-  begin_pipeline_frame();
-  render_worker::enqueue_begin_frame(frame.frameId, [frameSlot] {
-    static constexpr wgpu::CommandEncoderDescriptor EncoderDescriptor{.label = "Redraw encoder"};
-    g_framePackets[frameSlot].encoder = g_device.CreateCommandEncoder(&EncoderDescriptor);
-    webgpu::gpu_prof::frame_begin(g_framePackets[frameSlot].encoder);
-  });
+  if (!g_config.discardGpuFrames) {
+    begin_pipeline_frame();
+    render_worker::enqueue_begin_frame(frame.frameId, [frameSlot] {
+      static constexpr wgpu::CommandEncoderDescriptor EncoderDescriptor{.label = "Redraw encoder"};
+      g_framePackets[frameSlot].encoder = g_device.CreateCommandEncoder(&EncoderDescriptor);
+      webgpu::gpu_prof::frame_begin(g_framePackets[frameSlot].encoder);
+    });
+  }
   g_cpuFrameStart = PresentClock::now();
   return true;
 }
@@ -1734,6 +1752,46 @@ void end_frame(EndFrameCallback callback) {
     map_staging_buffer(stagingSlot, true);
     process_events();
   });
+}
+
+void discard_frame() {
+  ZoneScoped;
+  ASSERT(g_config.discardGpuFrames, "discard_frame requires discardGpuFrames");
+  ASSERT(!g_inOffscreen, "discard_frame called while offscreen rendering is active");
+  ASSERT(g_currentRenderPass == UINT32_MAX, "discard_frame called before finish finalized the current render pass");
+  ASSERT(g_recordingFrame != nullptr, "discard_frame called without an active frame");
+
+  if (g_cpuFrameStart.time_since_epoch().count() != 0) {
+    const auto cpuFrameTime = PresentClock::now() - g_cpuFrameStart;
+    update_ema(g_cpuFrameTimeNs, duration_ns(cpuFrameTime));
+    const double cpuFrameTimeMs = std::chrono::duration<double, std::milli>{cpuFrameTime}.count();
+    TracyPlot("aurora: cpuFrameTimeMs", cpuFrameTimeMs);
+  }
+
+  auto& frame = current_frame_packet();
+  g_stats.drawCallCount = g_drawCallCount;
+  g_stats.mergedDrawCallCount = g_mergedDrawCallCount;
+  g_stats.lastVertSize = static_cast<uint32_t>(frame.verts.size());
+  g_stats.lastUniformSize = static_cast<uint32_t>(frame.uniforms.size());
+  g_stats.lastIndexSize = static_cast<uint32_t>(frame.indices.size());
+  g_stats.lastStorageSize = static_cast<uint32_t>(frame.storage.size());
+  g_stats.lastTextureUploadSize = static_cast<uint32_t>(frame.textureUpload.size());
+  ++g_stats.discardedGpuFrameCount;
+
+  for (auto& array : gx::g_gxState.arrays) {
+    array.cachedRange = {};
+  }
+
+  const size_t frameSlot = g_recordingFrameSlot;
+  const size_t stagingSlot = frame.stagingBuffer;
+  ++g_frameIndex;
+  g_recordingFrame = nullptr;
+  g_currentRenderPass = UINT32_MAX;
+  frame = {};
+  g_frameSlots.release(frameSlot);
+  g_stagingSlots.release(stagingSlot);
+  expire_cached_bind_groups();
+  process_events();
 }
 
 uint32_t current_frame() noexcept { return g_frameIndex; }
