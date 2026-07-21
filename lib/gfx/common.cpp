@@ -1365,9 +1365,11 @@ void initialize() {
   //     g_instance.ProcessEvents();
   //   }
   // });
-  depth_peek::initialize();
-  tex_copy_conv::initialize();
-  tex_palette_conv::initialize();
+  if (!g_config.discardGpuFrames) {
+    depth_peek::initialize();
+    tex_copy_conv::initialize();
+    tex_palette_conv::initialize();
+  }
   texture_replacement::initialize();
 
   // For uniform & storage buffer offset alignments
@@ -1509,9 +1511,11 @@ void shutdown() {
   if (!g_config.discardGpuFrames) {
     shutdown_pipeline_cache();
   }
-  depth_peek::shutdown();
-  tex_copy_conv::shutdown();
-  tex_palette_conv::shutdown();
+  if (!g_config.discardGpuFrames) {
+    depth_peek::shutdown();
+    tex_copy_conv::shutdown();
+    tex_palette_conv::shutdown();
+  }
   texture_replacement::shutdown();
   gx::shutdown();
 #ifdef AURORA_ENABLE_RMLUI
@@ -2326,6 +2330,9 @@ Range push_texture_data(const uint8_t* data, u32 bytesPerRow, u32 rowsPerImage) 
 
 BindGroupRef bind_group_ref(const WGPUBindGroupDescriptor& descriptor) {
   const auto id = xxh3_hash(descriptor);
+  if (g_config.discardGpuFrames) {
+    return id;
+  }
   std::lock_guard lock{g_bindGroupCacheMutex};
   const auto it = g_cachedBindGroups.find(id);
   if (it == g_cachedBindGroups.end()) {
@@ -2348,6 +2355,9 @@ wgpu::BindGroup find_bind_group(BindGroupRef id) {
 }
 
 wgpu::Sampler sampler_ref(const wgpu::SamplerDescriptor& descriptor) {
+  if (g_config.discardGpuFrames) {
+    return {};
+  }
   const auto id = xxh3_hash(descriptor);
   std::lock_guard lock{g_samplerCacheMutex};
   auto it = g_cachedSamplers.find(id);

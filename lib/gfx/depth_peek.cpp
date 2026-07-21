@@ -144,7 +144,7 @@ wgpu::ComputePipeline create_pipeline(const wgpu::BindGroupLayout& bindGroupLayo
       .nextInChain = &wgslSource,
       .label = label,
   };
-  const auto module = g_device.CreateShaderModule(&moduleDescriptor);
+  const auto module = webgpu::create_shader_module(moduleDescriptor);
 
   const wgpu::PipelineLayoutDescriptor layoutDescriptor{
       .bindGroupLayoutCount = 1,
@@ -160,7 +160,7 @@ wgpu::ComputePipeline create_pipeline(const wgpu::BindGroupLayout& bindGroupLayo
               .entryPoint = "cs_main",
           },
   };
-  return g_device.CreateComputePipeline(&pipelineDescriptor);
+  return webgpu::create_compute_pipeline(pipelineDescriptor);
 }
 
 wgpu::BindGroupLayout create_bind_group_layout(const char* label) {
@@ -387,7 +387,7 @@ void encode_frame_snapshot(const wgpu::CommandEncoder& cmd, const wgpu::TextureV
   }
 
   ASSERT(render_worker::is_worker_thread(), "Depth peek queue write must run on the render worker");
-  g_queue.WriteBuffer(paramsBuffer, 0, &params, sizeof(params));
+  webgpu::write_buffer(paramsBuffer, 0, &params, sizeof(params));
 
   const std::array bindGroupEntries{
       wgpu::BindGroupEntry{

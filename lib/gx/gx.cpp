@@ -677,7 +677,7 @@ wgpu::RenderPipeline build_pipeline(const PipelineConfig& config, ArrayRef<wgpu:
           },
       .fragment = &fragmentState,
   };
-  return g_device.CreateRenderPipeline(&descriptor);
+  return webgpu::create_render_pipeline(descriptor);
 }
 
 void populate_pipeline_config(PipelineConfig& config, GXPrimitive primitive, GXVtxFmt fmt) noexcept {

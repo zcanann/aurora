@@ -28,6 +28,10 @@ typedef struct {
   uint32_t lastTextureUploadSize;
   uint64_t submittedCommandBufferCount;
   uint64_t discardedGpuFrameCount;
+  uint64_t createdShaderModuleCount;
+  uint64_t createdRenderPipelineCount;
+  uint64_t createdComputePipelineCount;
+  uint64_t directQueueWriteCount;
 } AuroraStats;
 
 const AuroraStats* aurora_get_stats();

@@ -101,7 +101,9 @@ TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mi
           .bytesPerRow = bytesPerRow,
           .rowsPerImage = heightBlocks,
       };
-      g_queue.WriteTexture(&dstView, data.data() + offset, dataSize, &dataLayout, &physicalSize);
+      if (!g_config.discardGpuFrames) {
+        webgpu::write_texture(dstView, data.data() + offset, dataSize, dataLayout, physicalSize);
+      }
     }
     offset += dataSize;
   }
@@ -129,6 +131,10 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
       .mipLevelCount = mips,
       .sampleCount = 1,
   };
+  if (g_config.discardGpuFrames) {
+    return std::make_shared<TextureRef>(wgpu::Texture{}, wgpu::TextureView{}, wgpu::TextureView{}, size, wgpuFormat,
+                                        mips, gxFormat);
+  }
   auto texture = g_device.CreateTexture(&textureDescriptor);
   const auto viewLabel = fmt::format("{} view", label);
   wgpu::TextureViewDescriptor textureViewDescriptor{
@@ -164,6 +170,10 @@ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat, 
       .mipLevelCount = 1,
       .sampleCount = 1,
   };
+  if (g_config.discardGpuFrames) {
+    return std::make_shared<TextureRef>(wgpu::Texture{}, wgpu::TextureView{}, wgpu::TextureView{}, size, wgpuFormat, 1,
+                                        gxFormat);
+  }
   auto texture = g_device.CreateTexture(&textureDescriptor);
 
   // Create texture view for color attachments
@@ -197,6 +207,10 @@ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, co
       .mipLevelCount = 1,
       .sampleCount = 1,
   };
+  if (g_config.discardGpuFrames) {
+    return std::make_shared<TextureRef>(wgpu::Texture{}, wgpu::TextureView{}, wgpu::TextureView{}, size, wgpuFormat, 1,
+                                        gxFormat);
+  }
   auto texture = g_device.CreateTexture(&textureDescriptor);
 
   // Create texture view for color attachments
@@ -250,7 +264,9 @@ void write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept {
           .bytesPerRow = bytesPerRow,
           .rowsPerImage = heightBlocks,
       };
-      g_queue.WriteTexture(&dstView, data.data() + offset, dataSize, &dataLayout, &physicalSize);
+      if (!g_config.discardGpuFrames) {
+        webgpu::write_texture(dstView, data.data() + offset, dataSize, dataLayout, physicalSize);
+      }
     }
     offset += dataSize;
   }

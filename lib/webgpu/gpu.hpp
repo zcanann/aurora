@@ -6,6 +6,7 @@
 #include "wgpu.hpp"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 
 struct SDL_Window;
@@ -57,6 +58,12 @@ extern bool g_bcTexturesSupported;
 extern bool g_astcTexturesSupported;
 extern bool g_textureComponentSwizzleSupported;
 
+wgpu::ShaderModule create_shader_module(const wgpu::ShaderModuleDescriptor& descriptor);
+wgpu::RenderPipeline create_render_pipeline(const wgpu::RenderPipelineDescriptor& descriptor);
+wgpu::ComputePipeline create_compute_pipeline(const wgpu::ComputePipelineDescriptor& descriptor);
+void write_buffer(const wgpu::Buffer& buffer, uint64_t bufferOffset, const void* data, size_t size);
+void write_texture(const wgpu::TexelCopyTextureInfo& destination, const void* data, size_t dataSize,
+                   const wgpu::TexelCopyBufferLayout& dataLayout, const wgpu::Extent3D& writeSize);
 bool initialize(AuroraBackend backend, bool allowCpu);
 void shutdown();
 void release_surface() noexcept;

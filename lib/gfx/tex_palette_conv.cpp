@@ -107,7 +107,7 @@ static PipelineInfo create_pipeline(std::string_view fragBindingsAndShader, wgpu
       .nextInChain = &wgslSource,
       .label = label,
   };
-  auto module = g_device.CreateShaderModule(&moduleDescriptor);
+  auto module = webgpu::create_shader_module(moduleDescriptor);
 
   const std::array bindGroupLayoutEntries{
       wgpu::BindGroupLayoutEntry{
@@ -176,7 +176,7 @@ static PipelineInfo create_pipeline(std::string_view fragBindingsAndShader, wgpu
   };
 
   return PipelineInfo{
-      .pipeline = g_device.CreateRenderPipeline(&pipelineDescriptor),
+      .pipeline = webgpu::create_render_pipeline(pipelineDescriptor),
       .bindGroupLayout = std::move(bindGroupLayout),
   };
 }

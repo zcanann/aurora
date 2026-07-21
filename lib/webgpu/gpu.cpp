@@ -66,6 +66,32 @@ bool g_astcTexturesSupported = false;
 bool g_textureComponentSwizzleSupported = false;
 static std::atomic_bool g_initialized = false;
 
+wgpu::ShaderModule create_shader_module(const wgpu::ShaderModuleDescriptor& descriptor) {
+  ++gfx::g_stats.createdShaderModuleCount;
+  return g_device.CreateShaderModule(&descriptor);
+}
+
+wgpu::RenderPipeline create_render_pipeline(const wgpu::RenderPipelineDescriptor& descriptor) {
+  ++gfx::g_stats.createdRenderPipelineCount;
+  return g_device.CreateRenderPipeline(&descriptor);
+}
+
+wgpu::ComputePipeline create_compute_pipeline(const wgpu::ComputePipelineDescriptor& descriptor) {
+  ++gfx::g_stats.createdComputePipelineCount;
+  return g_device.CreateComputePipeline(&descriptor);
+}
+
+void write_buffer(const wgpu::Buffer& buffer, uint64_t bufferOffset, const void* data, size_t size) {
+  ++gfx::g_stats.directQueueWriteCount;
+  g_queue.WriteBuffer(buffer, bufferOffset, data, size);
+}
+
+void write_texture(const wgpu::TexelCopyTextureInfo& destination, const void* data, size_t dataSize,
+                   const wgpu::TexelCopyBufferLayout& dataLayout, const wgpu::Extent3D& writeSize) {
+  ++gfx::g_stats.directQueueWriteCount;
+  g_queue.WriteTexture(&destination, data, dataSize, &dataLayout, &writeSize);
+}
+
 namespace {
 
 AuroraLogLevel wgpu_log_level(wgpu::LoggingType type) {
@@ -447,7 +473,7 @@ fn fs_premultiplied_alpha(in: VertexOutput) -> @location(0) vec4<f32> {
       .nextInChain = &sourceDescriptor,
       .label = "XFB Copy Module",
   };
-  auto module = g_device.CreateShaderModule(&moduleDescriptor);
+  auto module = create_shader_module(moduleDescriptor);
   const std::array bindGroupLayoutEntries{
       wgpu::BindGroupLayoutEntry{
           .binding = 0,
@@ -510,7 +536,7 @@ fn fs_premultiplied_alpha(in: VertexOutput) -> @location(0) vec4<f32> {
             },
         .fragment = &fragmentState,
     };
-    return g_device.CreateRenderPipeline(&pipelineDescriptor);
+    return create_render_pipeline(pipelineDescriptor);
   };
   g_CopyPipeline = make_copy_pipeline("XFB Copy Pipeline", "fs_opaque", nullptr);
 
@@ -539,7 +565,7 @@ void create_resample_pipeline() {
       .nextInChain = &sourceDescriptor,
       .label = "Present Resample Module",
   };
-  auto module = g_device.CreateShaderModule(&moduleDescriptor);
+  auto module = create_shader_module(moduleDescriptor);
   const std::array colorTargets{wgpu::ColorTargetState{
       .format = g_graphicsConfig.surfaceConfiguration.format,
       .writeMask = wgpu::ColorWriteMask::All,
@@ -606,7 +632,7 @@ void create_resample_pipeline() {
           },
       .fragment = &fragmentState,
   };
-  g_ResamplePipeline = g_device.CreateRenderPipeline(&pipelineDescriptor);
+  g_ResamplePipeline = create_render_pipeline(pipelineDescriptor);
 
   const wgpu::BufferDescriptor uniformBufferDescriptor{
       .label = "Present Resample Uniform Buffer",
@@ -650,7 +676,7 @@ const TextureWithSampler& resample_present_source(const wgpu::CommandEncoder& en
       .frameHeight = static_cast<float>(height),
   };
   ASSERT(gfx::render_worker::is_worker_thread(), "Present resample queue write must run on the render worker");
-  g_queue.WriteBuffer(g_ResampleUniformBuffer, 0, &uniform, sizeof(uniform));
+  write_buffer(g_ResampleUniformBuffer, 0, &uniform, sizeof(uniform));
 
   const std::array bindGroupEntries{
       wgpu::BindGroupEntry{
@@ -1041,8 +1067,10 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
       .msaaSamples = g_config.msaa,
       .textureAnisotropy = g_config.maxTextureAnisotropy,
   };
-  create_copy_pipeline();
-  create_resample_pipeline();
+  if (!g_config.discardGpuFrames) {
+    create_copy_pipeline();
+    create_resample_pipeline();
+  }
   gpu_prof::initialize();
   resize_swapchain(size.fb_width, size.fb_height, size.native_fb_width, size.native_fb_height, true);
   g_initialized = true;
@@ -1111,7 +1139,9 @@ static void resize_swapchain_internal(uint32_t width, uint32_t height, uint32_t 
   g_frameBuffer = create_render_texture(width, height, true);
   g_frameBufferResolved = create_render_texture(width, height, false);
   g_depthBuffer = create_depth_texture(width, height);
-  g_CopyBindGroup = create_copy_bind_group(present_source());
+  if (!g_config.discardGpuFrames) {
+    g_CopyBindGroup = create_copy_bind_group(present_source());
+  }
 }
 
 bool refresh_surface(bool recreate) {

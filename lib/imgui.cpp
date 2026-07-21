@@ -29,6 +29,7 @@ static float g_scale;
 static std::string g_imguiSettings{};
 static std::string g_imguiLog{};
 static bool g_useSdlRenderer = false;
+static bool g_rendererBackendInitialized = false;
 
 static std::vector<SDL_Texture*> g_sdlTextures;
 static std::vector<wgpu::Texture> g_wgpuTextures;
@@ -50,6 +51,12 @@ void create_context() noexcept {
 
 void initialize() noexcept {
   ZoneScoped;
+  if (g_config.discardGpuFrames) {
+    ImGui_ImplSDL3_InitForOther(window::get_sdl_window());
+    g_useSdlRenderer = false;
+    g_rendererBackendInitialized = false;
+    return;
+  }
   SDL_Renderer* renderer = window::get_sdl_renderer();
   ImGui_ImplSDL3_InitForSDLRenderer(window::get_sdl_window(), renderer);
   g_useSdlRenderer = renderer != nullptr;
@@ -61,17 +68,22 @@ void initialize() noexcept {
     info.RenderTargetFormat = static_cast<WGPUTextureFormat>(webgpu::g_graphicsConfig.surfaceConfiguration.format);
     ImGui_ImplWGPU_Init(&info);
   }
+  g_rendererBackendInitialized = true;
 }
 
 void shutdown() noexcept {
   ZoneScoped;
-  if (g_useSdlRenderer) {
-    ImGui_ImplSDLRenderer3_Shutdown();
-  } else {
-    ImGui_ImplWGPU_Shutdown();
+  if (g_rendererBackendInitialized) {
+    if (g_useSdlRenderer) {
+      ImGui_ImplSDLRenderer3_Shutdown();
+    } else {
+      ImGui_ImplWGPU_Shutdown();
+    }
   }
   ImGui_ImplSDL3_Shutdown();
   ImGui::DestroyContext();
+  g_useSdlRenderer = false;
+  g_rendererBackendInitialized = false;
   for (const auto& texture : g_sdlTextures) {
     SDL_DestroyTexture(texture);
   }
@@ -122,7 +134,12 @@ void new_frame(const AuroraWindowSize& size) noexcept {
   };
   ImVec2 displaySize{static_cast<float>(size.width), static_cast<float>(size.height)};
 
-  if (g_useSdlRenderer) {
+  if (!g_rendererBackendInitialized) {
+    if (!ImGui::GetIO().Fonts->IsBuilt()) {
+      ImGui::GetIO().Fonts->Build();
+    }
+    g_scale = size.scale;
+  } else if (g_useSdlRenderer) {
     if (SDL_Renderer* renderer = window::get_sdl_renderer()) {
       float renderScaleX = 1.0f;
       float renderScaleY = 1.0f;
@@ -248,6 +265,9 @@ static void enqueue_texture_upload(wgpu::Buffer buffer, wgpu::TexelCopyTextureIn
 }
 
 ImTextureID add_texture(uint32_t width, uint32_t height, const uint8_t* data) noexcept {
+  if (g_config.discardGpuFrames) {
+    return {};
+  }
   if (SDL_Renderer* renderer = window::get_sdl_renderer()) {
     SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, width, height);
     SDL_UpdateTexture(texture, nullptr, data, width * 4);

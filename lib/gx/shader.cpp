@@ -1940,6 +1940,6 @@ wgpu::ShaderModule build_shader(const ShaderConfig& config) noexcept {
       .nextInChain = &wgslDescriptor,
       .label = label.c_str(),
   };
-  return webgpu::g_device.CreateShaderModule(&shaderDescriptor);
+  return webgpu::create_shader_module(shaderDescriptor);
 }
 } // namespace aurora::gx

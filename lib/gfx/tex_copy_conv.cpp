@@ -354,7 +354,7 @@ static wgpu::RenderPipeline create_depth_snapshot_pipeline(const std::string_vie
       .nextInChain = &wgslSource,
       .label = label,
   };
-  const auto module = g_device.CreateShaderModule(&moduleDescriptor);
+  const auto module = webgpu::create_shader_module(moduleDescriptor);
 
   const std::array colorTargets{wgpu::ColorTargetState{
       .format = wgpu::TextureFormat::R32Float,
@@ -384,7 +384,7 @@ static wgpu::RenderPipeline create_depth_snapshot_pipeline(const std::string_vie
           },
       .fragment = &fragmentState,
   };
-  return g_device.CreateRenderPipeline(&pipelineDescriptor);
+  return webgpu::create_render_pipeline(pipelineDescriptor);
 }
 
 static wgpu::RenderPipeline create_pipeline(const ConvPipeline& conv, const std::string_view shaderPreamble,
@@ -401,7 +401,7 @@ static wgpu::RenderPipeline create_pipeline(const ConvPipeline& conv, const std:
       .nextInChain = &wgslSource,
       .label = conv.label,
   };
-  const auto module = g_device.CreateShaderModule(&moduleDescriptor);
+  const auto module = webgpu::create_shader_module(moduleDescriptor);
 
   const std::array colorTargets{wgpu::ColorTargetState{
       .format = conv.outputFormat,
@@ -433,7 +433,7 @@ static wgpu::RenderPipeline create_pipeline(const ConvPipeline& conv, const std:
           },
       .fragment = &fragmentState,
   };
-  return g_device.CreateRenderPipeline(&pipelineDescriptor);
+  return webgpu::create_render_pipeline(pipelineDescriptor);
 }
 
 bool needs_conversion(const GXTexFmt fmt) { return g_pipelines.contains(fmt); }

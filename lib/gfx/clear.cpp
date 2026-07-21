@@ -51,7 +51,7 @@ fn fs_main() -> @location(0) vec4<f32> {
       .nextInChain = &sourceDescriptor,
       .label = "EFB Clear Module",
   };
-  auto module = g_device.CreateShaderModule(&moduleDescriptor);
+  auto module = webgpu::create_shader_module(moduleDescriptor);
   constexpr wgpu::PipelineLayoutDescriptor layoutDescriptor{
       .bindGroupLayoutCount = 0,
       .bindGroupLayouts = nullptr,
@@ -108,7 +108,7 @@ fn fs_main() -> @location(0) vec4<f32> {
           },
       .fragment = &fragmentState,
   };
-  return g_device.CreateRenderPipeline(&pipelineDescriptor);
+  return webgpu::create_render_pipeline(pipelineDescriptor);
 }
 
 void render(const DrawData& data, const wgpu::RenderPassEncoder& pass, const wgpu::Extent3D& targetSize) {

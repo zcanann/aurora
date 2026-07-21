@@ -490,7 +490,7 @@ wgpu::ComputeState compile_shader(std::string_view wgslSource, std::string_view 
       .label = label,
   };
   return {
-      .module = webgpu::g_device.CreateShaderModule(&desc),
+      .module = webgpu::create_shader_module(desc),
       .entryPoint = "main",
   };
 }
@@ -841,7 +841,7 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
           },
       .fragment = &fragmentState,
   };
-  return webgpu::g_device.CreateRenderPipeline(&pipelineDesc);
+  return webgpu::create_render_pipeline(pipelineDesc);
 }
 
 void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
